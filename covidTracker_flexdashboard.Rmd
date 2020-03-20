@@ -1,0 +1,63 @@
+---
+title: "COVID-19 Tracker"
+author: "Shubhayu Bhattacharyay, Eshan Joshi"
+date: "3/20/2020"
+output: flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+library(MRIcloudT1volumetrics)
+library(kirby21.mricloud)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+library(shiny)
+library(plotly)
+fileNames = get_txt_filenames(visits = 1, 
+                              file_types =  "volumes_corrected")
+dat = readFileList(fileNames$filename, 
+                   idList = fileNames$Subject_ID)
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+### Select Data Type and Level
+
+```{r}
+selectInput("typeChoice", label = "Type:",
+            choices = c(1,2), selected = 1)
+
+selectInput("levelChoice", label = "Level:",
+            choices = c(1:5), selected = 1)
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Average Composition Plot
+
+```{r}
+renderPlotly({
+  selectData <-
+    subset(dat, level == input$levelChoice & type == input$typeChoice)
+  smry <-
+    selectData %>% group_by(roi) %>% summarise(roiMean = mean(volume),
+                                               roiSD = sd(volume),
+                                               n = n()) %>% mutate(roi = as.factor(roi))
+    ggplot(data = smry, aes(x = roi, y = roiMean)) +
+      geom_bar(stat = "identity") +
+      ggtitle("Average Composition by Region of Interest") +
+      theme(
+        axis.text.x = element_text(angle = 50, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        plot.title = element_text(hjust = 0.5)
+      ) +
+      ylab('Average Volume (mm3)') +
+      xlab('Brain Region of Interest')
+})
+```
