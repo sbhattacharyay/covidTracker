@@ -7,17 +7,18 @@ runtime: shiny
 ---
 
 ```{r global, include=FALSE}
-library(MRIcloudT1volumetrics)
-library(kirby21.mricloud)
+library(shiny)
 library(magrittr)
 library(dplyr)
+library(httr)
 library(ggplot2)
-library(shiny)
 library(plotly)
-fileNames = get_txt_filenames(visits = 1, 
-                              file_types =  "volumes_corrected")
-dat = readFileList(fileNames$filename, 
-                   idList = fileNames$Subject_ID)
+library(rvest)
+library(tabulizer)
+
+req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
+stop_for_status(req)
+filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
 ```
 
 Column {.sidebar}
