@@ -1,0 +1,58 @@
+---
+title: "COVID-19 Tracker"
+author: "Shubhayu Bhattacharyay, Eshan Joshi"
+date: "3/20/2020"
+output: flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+
+library(shiny)
+library(magrittr)
+library(dplyr)
+library(httr)
+library(ggplot2)
+library(plotly)
+library(rvest)
+# library(tabulizerjars)
+library(tabulizer)
+# library(tabula)
+# library(tabularaster)
+
+# req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
+# stop_for_status(req)
+# filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
+
+download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
+unzip(zipfile = "covid-master.zip")
+setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
+datFileList <- list.files(pattern = "\\.csv$")
+lastFile <- tail(datFileList,n=1)
+jhuData <- read.csv(file = lastFile)
+setwd("..")
+setwd("..")
+setwd("..")
+
+# COVID Treatment and Vaccine Data
+loc <- 'https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf'
+out <- extract_tables(loc)
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+### Select Data Type and Level
+
+```{r}
+
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Average Composition Plot
+
+```{r}
+
+```
