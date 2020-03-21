@@ -26,6 +26,10 @@ library(tabulizer)
 
 download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
 unzip(zipfile = "covid-master.zip")
+setwd("/COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
+setwd("..")
+setwd("..")
+setwd("..")
 
 # COVID Treatment and Vaccine Data
 loc <- 'https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf'
