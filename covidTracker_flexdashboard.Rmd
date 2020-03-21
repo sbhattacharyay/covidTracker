@@ -7,6 +7,7 @@ runtime: shiny
 ---
 
 ```{r global, include=FALSE}
+
 library(shiny)
 library(magrittr)
 library(dplyr)
@@ -15,10 +16,19 @@ library(ggplot2)
 library(plotly)
 library(rvest)
 library(tabulizer)
+library(tabulizerjars)
+library(tabula)
+library(tabularaster)
 
 req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
 stop_for_status(req)
 filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
+
+
+
+# COVID Treatment and Vaccine Data
+loc <- 'https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf'
+out <- extract_tables(loc)
 ```
 
 Column {.sidebar}
