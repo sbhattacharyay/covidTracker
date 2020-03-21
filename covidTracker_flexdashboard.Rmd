@@ -35,6 +35,7 @@ setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
 datFileList <- sort(list.files(pattern = "\\.csv$"))
 lastFile <- tail(datFileList, n = 1)
 jhuData <- read.csv(file = lastFile) %>% mutate(Last.Update=as.character(Last.Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%dT%H:%M:%S",locale = locale(tz="GMT")))
+jhuData$Source <- rep("Johns Hopkins University CSSE",nrow(jhuData))
 setwd("..")
 setwd("..")
 setwd("..")
@@ -60,6 +61,7 @@ italy_dateTim_updated <- sub(".*: ", "", italy_dateTim_updated)
 parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome"))
 
 italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
+italy_coords$Source <- rep("Ministry of Health of Italy",nrow(italy_coords))
 
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
@@ -71,7 +73,7 @@ sk_table<-htmltab(sk_link)
 
 sk_coords <-read.csv('https://simplemaps.com/static/data/country-cities/kr/kr.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
 
-covidData<-merge(jhuData,italy_coords,by = c("Province.State","Country.Region","Latitude","Longitude"),all=TRUE)
+covidData<-merge(jhuData,italy_coords,by = c("Province.State","Country.Region","Latitude","Longitude","Source"),all=TRUE)
 ```
 
 Column {.sidebar}
