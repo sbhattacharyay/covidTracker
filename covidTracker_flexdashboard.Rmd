@@ -19,6 +19,11 @@ library(rvest)
 library(tabulizer)
 # library(tabula)
 # library(tabularaster)
+library(XML)
+library(xml2)
+library(htmltab)
+library(tidyverse)
+library(readr)
 
 # req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
 # stop_for_status(req)
@@ -27,16 +32,48 @@ library(tabulizer)
 download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
 unzip(zipfile = "covid-master.zip")
 setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
-datFileList <- list.files(pattern = "\\.csv$")
-lastFile <- tail(datFileList,n=1)
-jhuData <- read.csv(file = lastFile)
+datFileList <- sort(list.files(pattern = "\\.csv$"))
+lastFile <- tail(datFileList, n = 1)
+jhuData <- read.csv(file = lastFile) %>% mutate(Last.Update=as.character(Last.Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%dT%H:%M:%S",locale = locale(tz="GMT")))
+jhuData$Source <- rep("Johns Hopkins University CSSE",nrow(jhuData))
 setwd("..")
 setwd("..")
 setwd("..")
 
 # COVID Treatment and Vaccine Data
-loc <- 'https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf'
-out <- extract_tables(loc)
+out <- extract_tables('https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf')
+
+# US Department of State Travel Advisory
+loc <-
+  'https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/'
+advisory <-
+  htmltab(loc) %>% mutate(Advisory = str_remove_all(Advisory, " Travel Advisory")) %>% rename(Country.Region = Advisory) %>% rename(Advisory.Level = Level) %>% rename(Advisory.DateUpdated = 'Date Updated')
+
+# Italy (Ministero della Salute) Regional Data Scraping
+italy_Link <-
+  'http://www.salute.gov.it/portale/nuovocoronavirus/dettaglioContenutiNuovoCoronavirus.jsp?lingua=italiano&id=5351&area=nuovoCoronavirus&menu=vuoto'
+italy_web <- read_html(italy_Link)
+italy_dateTim_updated <- italy_web %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//h4[contains(@class, 'blu-italia-base-color') and contains(@style,'font-size:24px;margin:0;')]") %>% 
+  rvest::html_text()
+italy_dateTim_updated <- sub(".*: ", "", italy_dateTim_updated)
+parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome"))
+
+italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
+italy_coords$Source <- rep("Ministry of Health of Italy",nrow(italy_coords))
+
+italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
+italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
+
+
+# South Korea (보건복지부) Regional Data Scraping
+sk_link <-'http://ncov.mohw.go.kr/bdBoardList_Real.do?brdId=1&brdGubun=13&ncvContSeq=&contSeq=&board_id=&gubun='
+sk_table<-htmltab(sk_link)
+
+sk_coords <-read.csv('https://simplemaps.com/static/data/country-cities/kr/kr.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
+
+covidData<-merge(jhuData,italy_coords,by = c("Province.State","Country.Region","Latitude","Longitude","Source"),all=TRUE)
 ```
 
 Column {.sidebar}
