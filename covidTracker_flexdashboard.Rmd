@@ -25,6 +25,28 @@ library(htmltab)
 library(tidyverse)
 library(readr)
 
+convertItalyNames <- function(provinceNames) {
+  new_provinceNames = provinceNames
+  for (i in 1:length(provinceNames)){
+    if (provinceNames[i] == 'Emilia-Romagna') {
+      new_provinceNames[i] <- 'Emilia Romagna'
+    } else if (provinceNames[i] == 'Friuli-Venezia Giulia') {
+      new_provinceNames[i] <- 'Friuli V.G.'
+    } else if (provinceNames[i] == 'Lombardy') {
+      new_provinceNames[i] <- 'Lombardia'
+    } else if (provinceNames[i] == 'Piedmont') {
+      new_provinceNames[i] <- 'Piemonte'
+    } else if (provinceNames[i] == 'Trentino-Alto Adige') {
+      new_provinceNames[i] <- 'Trento'
+    } else if (provinceNames[i] == 'Tuscany') {
+      new_provinceNames[i] <- 'Toscana'
+    } else if (provinceNames[i] == 'Valle dâ€™Aosta') {
+      new_provinceNames[i] <- 'Valle d\'Aosta'
+    }
+  }
+  return(new_provinceNames)
+}
+
 # req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
 # stop_for_status(req)
 # filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
@@ -58,22 +80,71 @@ italy_dateTim_updated <- italy_web %>%
   xml2::xml_find_all("//h4[contains(@class, 'blu-italia-base-color') and contains(@style,'font-size:24px;margin:0;')]") %>% 
   rvest::html_text()
 italy_dateTim_updated <- sub(".*: ", "", italy_dateTim_updated)
-parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome"))
-
-italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
-italy_coords$Source <- rep("Ministry of Health of Italy",nrow(italy_coords))
-
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
+output <- extract_tables(italy_pdf_link,output = "data.frame", dec=",")
+italy_table <- do.call(rbind, output) %>% select(c(1,6,7,8))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4) %>% filter(Confirmed != "") %>% head(-1) 
+rownames(italy_table) <- c()
+italy_table$Last.Update <- rep(parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),nrow(italy_table))
+italy_table$Source <- rep("Ministry of Health of Italy",nrow(italy_table))
+italy_table[c(2,3,4)] <- lapply(italy_table[c(2,3,4)],function(x) as.numeric(gsub("\\.", "", as.character(x))))
 
+italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)%>% mutate(Province.State=convertItalyNames(as.character(Province.State)))
+
+italy_table<-merge(italy_table,italy_coords,by = c("Province.State"),all=TRUE)
+bolIdx<-italy_table$Province.State == 'Bolzano'
+italy_table[bolIdx,]$Country.Region <- 'Italy'
+italy_table[bolIdx,]$Longitude <-11.35
+italy_table[bolIdx,]$Latitude <- 46.5
 
 # South Korea (보건복지부) Regional Data Scraping
 sk_link <-'http://ncov.mohw.go.kr/bdBoardList_Real.do?brdId=1&brdGubun=13&ncvContSeq=&contSeq=&board_id=&gubun='
-sk_table<-htmltab(sk_link)
+sk_table<-htmltab(sk_link)%>%tail(-1)%>%rename(Province.State=1,Increase=2,Confirmed=3,Recovered=4,Deaths=5,Incidence.Rate=6)%>%mutate(Province.State=c("Seoul","Busan","Daegu","Incheon","Gwangju","Daejeon","Ulsan","Sejong","Gyeonggi-do","Gangwon","Chungbuk","Chungnam","Jeonbuk","Jeonnam","Gyeongbuk","Gyeongnam","Jeju","Quarantined"))%>%select(Province.State,Confirmed,Recovered,Deaths)
+sk_table$Source <- rep("Ministry of Health and Welfare of the Republic of Korea",nrow(sk_table))
+
+sk_web <- read_html(sk_link)
+sk_dateTim_updated <- sk_web %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//p[contains(@class, 'info')]") %>% 
+  rvest::html_text()
+sk_dateTim_updated<-sk_dateTim_updated[1]
+sk_dateTim_updated<-substr(sk_dateTim_updated, 1, 9)
+if (substr(sk_dateTim_updated, 1, 1) == " "){
+  substr(sk_dateTim_updated, start = 1, stop = 1)<-"0"
+}
+sk_dateTim_updated<-paste(sk_dateTim_updated,substring(Sys.Date(),1,4))
+sk_table$Last.Update <- rep(parse_datetime(sk_dateTim_updated,format="%m.%d. %H %Y",locale = locale(tz="GMT")),nrow(sk_table))
 
 sk_coords <-read.csv('https://simplemaps.com/static/data/country-cities/kr/kr.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
 
-covidData<-merge(jhuData,italy_coords,by = c("Province.State","Country.Region","Latitude","Longitude","Source"),all=TRUE)
+sk_table<-merge(sk_table,sk_coords,by = c("Province.State"),all=TRUE)
+sk_table$Country.Region<-rep("Korea, South",nrow(sk_table))
+chungIdx<-sk_table$Province.State == 'Chungnam'
+gyeoIdx<-sk_table$Province.State == 'Gyeongbuk'
+g_doIdx<-sk_table$Province.State == 'Gyeonggi-do'
+jeonIdx<-sk_table$Province.State == 'Jeonnam'
+quarIdx<-sk_table$Province.State == 'Quarantined'
+sejIdx<-sk_table$Province.State == 'Sejong'
+
+sk_table[chungIdx,]$Longitude <-126.800000
+sk_table[chungIdx,]$Latitude <- 36.518400
+
+sk_table[gyeoIdx,]$Longitude <-128.8889
+sk_table[gyeoIdx,]$Latitude <- 36.4919
+
+sk_table[g_doIdx,]$Longitude <-127.5183
+sk_table[g_doIdx,]$Latitude <- 37.4138
+
+sk_table[jeonIdx,]$Longitude <-126.9910
+sk_table[jeonIdx,]$Latitude <- 34.8679
+
+sk_table[quarIdx,]$Longitude <-127.7669
+sk_table[quarIdx,]$Latitude <- 35.9078
+
+sk_table[sejIdx,]$Longitude <-127.2822
+sk_table[sejIdx,]$Latitude <- 36.4870 
+
+covidData<-rbind(jhuData,italy_table,sk_table)
 ```
 
 Column {.sidebar}
