@@ -24,6 +24,9 @@ library(xml2)
 library(htmltab)
 library(tidyverse)
 library(readr)
+library(pdftools)
+library(tesseract)
+library(openxlsx)
 
 convertItalyNames <- function(provinceNames) {
   new_provinceNames = provinceNames
@@ -47,10 +50,6 @@ convertItalyNames <- function(provinceNames) {
   return(new_provinceNames)
 }
 
-# req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
-# stop_for_status(req)
-# filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
-
 download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
 unzip(zipfile = "covid-master.zip")
 setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
@@ -63,7 +62,14 @@ setwd("..")
 setwd("..")
 
 # COVID Treatment and Vaccine Data
-out <- extract_tables('https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf')
+
+milken_vac_link <- 'https://milkeninstitute.org/covid-19-tracker'
+milken_web <- read_html(milken_vac_link)
+milken_vac_pdfLink<-xpathSApply(htmlParse(milken_web), "//a[contains(@style,'color: #ffffff; text-decoration: none;')]/@href")
+
+treatmentData<-read.xlsx("Covid19 Tracker_WEB.xlsx",sheet=1)%>%rename(Type.of.Product=1,Developer.Organization=2,Current.Stage.of.Development=3,Funding.Sources=4,Anticipated.Timing=5,Comments=6,Source=7,Links=8)%>%select(Type.of.Product,Developer.Organization,Current.Stage.of.Development,Funding.Sources,Anticipated.Timing,Comments,Source,Links)%>%drop_na(Developer.Organization)%>%filter(Type.of.Product!="Type of Product",Developer.Organization!="Developer Organization",Current.Stage.of.Development!="Current Stage of Development")
+
+vaccineData<-read.xlsx("Covid19 Tracker_WEB.xlsx",sheet=2)%>%rename(Type.of.Product=1,Developer.Organization=2,Current.Stage.of.Development=3,Funding.Sources=4,Anticipated.Timing=5,Comments=6,Source=7,Links=8)%>%select(Type.of.Product,Developer.Organization,Current.Stage.of.Development,Funding.Sources,Anticipated.Timing,Comments,Source,Links)%>%drop_na(Developer.Organization)%>%filter(Type.of.Product!="Type of Product",Developer.Organization!="Developer Organization",Current.Stage.of.Development!="Current Stage of Development")
 
 # US Department of State Travel Advisory
 loc <-
@@ -167,6 +173,8 @@ covidData <- covidData[, col_order]
 covidData[, c(4:6)] <- sapply(covidData[, c(4:6)], as.numeric)
 covidData <- arrange(covidData,desc(Confirmed))
 covidData <- covidData[!(covidData$Country.Region=="Italy" & covidData$Source=="Johns Hopkins University CSSE") & !(covidData$Country.Region=="Korea, South" & covidData$Source=="Johns Hopkins University CSSE"),]
+
+rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData")))
 ```
 
 Column {.sidebar}
