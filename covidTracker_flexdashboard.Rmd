@@ -24,6 +24,8 @@ library(xml2)
 library(htmltab)
 library(tidyverse)
 library(readr)
+library(pdftools)
+library(tesseract)
 
 convertItalyNames <- function(provinceNames) {
   new_provinceNames = provinceNames
@@ -47,10 +49,6 @@ convertItalyNames <- function(provinceNames) {
   return(new_provinceNames)
 }
 
-# req <- GET("https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports")
-# stop_for_status(req)
-# filelist <- unlist(lapply(content(req)$tree, "[", "path"), use.names = F)
-
 download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
 unzip(zipfile = "covid-master.zip")
 setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
@@ -63,7 +61,16 @@ setwd("..")
 setwd("..")
 
 # COVID Treatment and Vaccine Data
-out <- extract_tables('https://milkeninstitute.org/sites/default/files/2020-03/Covid19%20Tracker_WEB.pdf')
+
+milken_vac_link <- 'https://milkeninstitute.org/covid-19-tracker'
+milken_web <- read_html(milken_vac_link)
+milken_vac_pdfLink<-xpathSApply(htmlParse(milken_web), "//a[contains(@style,'color: #ffffff; text-decoration: none;')]/@href")
+download.file(milken_vac_pdfLink,destfile = "milken_vaccine.pdf")
+raw_text <- pdf_text("milken_vaccine.pdf")
+
+out <- extract_tables(milken_vac_pdfLink,output = "data.frame")
+vaccineData<-do.call(merge, list(out,all=TRUE))
+
 
 # US Department of State Travel Advisory
 loc <-
