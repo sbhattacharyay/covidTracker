@@ -70,6 +70,16 @@ loc <-
   'https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/'
 advisory <-
   htmltab(loc) %>% mutate(Advisory = str_remove_all(Advisory, " Travel Advisory")) %>% rename(Country.Region = Advisory) %>% rename(Advisory.Level = Level) %>% rename(Advisory.DateUpdated = 'Date Updated')
+advisory[151,1]="Taiwan*"
+advisory[85,1]="Saint Vincent and the Grenadines"
+advisory[107,1]="Kyrgyzstan"
+advisory[104,1]="Korea, South"
+advisory[98,1]="Israel"
+advisory[205,1]="Gambia, The"
+advisory[43,1]="Czechia"
+advisory[208,1]="Congo (Kinshasa)"
+advisory[209,1]="Congo (Brazzaville)"
+advisory[177,1]="Bahamas, The"
 
 # Italy (Ministero della Salute) Regional Data Scraping
 italy_Link <-
@@ -145,6 +155,18 @@ sk_table[sejIdx,]$Longitude <-127.2822
 sk_table[sejIdx,]$Latitude <- 36.4870 
 
 covidData<-rbind(jhuData,italy_table,sk_table)
+
+covidData<-merge(covidData,advisory,by = c("Country.Region"),all=T) %>% drop_na(Confirmed)
+new_adv <- rename(advisory, Province.State = Country.Region)
+covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)
+
+
+col_order <- c("Country.Region", "Province.State", "Last.Update","Confirmed","Recovered","Deaths","Advisory.Level","Advisory.DateUpdated","Latitude","Longitude","Source")
+covidData <- covidData[, col_order] 
+
+covidData[, c(4:6)] <- sapply(covidData[, c(4:6)], as.numeric)
+covidData <- arrange(covidData,desc(Confirmed))
+covidData <- covidData[!(covidData$Country.Region=="Italy" & covidData$Source=="Johns Hopkins University CSSE") & !(covidData$Country.Region=="Korea, South" & covidData$Source=="Johns Hopkins University CSSE"),]
 ```
 
 Column {.sidebar}
