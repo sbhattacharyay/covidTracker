@@ -1,5 +1,5 @@
 # 2019 Novel Coronavirus COVID-19 (2019-nCoV) Global Tracker
-Shubhayu Bhattacharyay, Eshan Joshi
+Shubhayu Bhattacharyay, Eshan Joshi \\
 Department of Biomedical Engineering, Johns Hopkins University
 
 **Data Sources:**
