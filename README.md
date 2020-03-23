@@ -4,7 +4,7 @@ Department of Biomedical Engineering, Johns Hopkins University
 
 **Data Sources:**
 * World Health Organization (WHO) Coronavirus disease situation reports: https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports
-* U.S. Dept. of State Travel Advisory: https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/
+* US Dept. of State Travel Advisory: https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/
 * Centers for Disease Control and Prevention (US): https://www.cdc.gov/coronavirus/2019-ncov/
 * Ministero della Salute (Italy): http://www.salute.gov.it/
 * National Health Commission (PR China): http://www.nhc.gov.cn/
