@@ -13,5 +13,5 @@ Department of Biomedical Engineering, Johns Hopkins University
 * Johns Hopkins University Center for Systems Science and Engineering (JHU CSSE): https://github.com/CSSEGISandData/COVID-19
 
 **Author Contributions:**
-* *Shubhayu:
-* *Eshan
+* *Shubhayu*:
+* *Eshan*:
