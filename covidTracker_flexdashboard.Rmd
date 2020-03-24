@@ -1,17 +1,19 @@
 ---
-title: "COVID-19 Tracker"
-#author: "Shubhayu Bhattacharyay, Eshan Joshi"
-date: "Last updated: 3/23/2020"
+title: "COVID-19 Global Case and Treatment Tracker"
+runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
-    orientation: rows
-theme: readable
-runtime: shiny
+    logo: university.shield.small.black.png
+    favicon: favicon-32x32.png
+    orientation: column
+    vertical_layout: fill
+    social: menu
+    source_code: embed
 ---
 
 ```{r global, include=FALSE}
 
-Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx")
+Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard")
 lapply(Packages, library, character.only = TRUE)
 
 jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
@@ -125,19 +127,57 @@ covidData <- covidData[, col_order]
 rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedData","tsDeathsData","tsRecoveredData")))
 ```
 
-
-Map
+Global Map
 =======================================
-input {.sidebar}
-----------
+Input {.sidebar}
+-------------------------------------
+
+### Active Cases
+
 ```{r }
-countryName <- levels(covidData$Country.Region)
-inputPanel(h3('Some Title')) 
-inputPanel(h4('Select locations of interest'), selectInput("countryChoice", label = "Country or Region", choices = countryName, selected = FALSE, width=180))
+
+valueBox(paste0(prettyNum(sum(covidData$Active), big.mark=",")),"global",width=NULL,color="aqua")
+
 ```
 
-Row {data-height=650}
-----------
+### Confirmed Cases
+
+```{r }
+
+valueBox(paste0(prettyNum(sum(covidData$Confirmed), big.mark=",")),"global",width=NULL,color="aqua")
+
+```
+
+### Deaths
+
+```{r }
+
+valueBox(paste0(prettyNum(sum(covidData$Deaths), big.mark=",")),"global",width=NULL,color="aqua")
+
+```
+
+### Filter by Country:
+
+```{r }
+
+countryNames <- levels(covidData$Country.Region)
+
+inputPanel(h4('Select locations of interest'), selectInput("countryChoice", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
+
+```
+
+### Last Update (GMT):
+
+```{r }
+
+valueBox(`attr<-`(Sys.time(),"tzone","GMT"),"",icon = icon("calendar"),width=NULL,color="aqua")
+```
+
+Column {data-width=650}
+-------------------------------------
+
+### Active Cases by Location
+
 ```{r }
 granData_active <- reactive({
   filter(covidData,Country.Region==input$countryChoice & Active>0)
@@ -155,32 +195,83 @@ granData_recovered<- reactive({
   filter(covidData,Country.Region==input$countryChoice & Recovered>0)
 })
 
-output$map <- renderLeaflet({leaflet(granData_active()) %>%
-    addTiles(group = "Active Cases") %>%
-    addCircleMarkers(data= granData_active(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Active),
-    stroke = FALSE, fillOpacity = 0.5, group = "Active Cases") %>%
-    addTiles(group = "Deaths") %>%
-    addCircleMarkers(data= granData_deaths(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Deaths),
-    stroke = FALSE, fillOpacity = 0.5, color="red", group = "Deaths")%>%
-    addTiles(group = "Confirmed Cases") %>%
-    addCircleMarkers(data= granData_confirmed(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Confirmed),
-    stroke = FALSE, fillOpacity = 0.5, color="orange", group = "Confirmed Cases")%>%
-    addTiles(group = "Recovered Cases") %>%
-    addCircleMarkers(data= granData_recovered(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Recovered),
-    stroke = FALSE, fillOpacity = 0.5, color="green", group = "Recovered Cases")%>%
-    addLayersControl(
-    overlayGroups = c("Active Cases", "Deaths", "Confirmed Cases", "Recovered Cases"),
-    options = layersControlOptions(collapsed = FALSE)
-  )%>%
-    hideGroup("Deaths")%>%
-    hideGroup("Confirmed Cases")%>%
-    hideGroup("Recovered Cases")
+WorldCountry <-geojsonio::geojson_read("./countries.geo.json", what = "sp")
+
+# output$map <- renderLeaflet({leaflet(granData_active()) %>%
+#     addProviderTiles(providers$CartoDB.Positron,group = "Active Cases") %>%
+#     addCircleMarkers(data= granData_active(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Active),
+#                      stroke = FALSE, fillOpacity = 0.5, group = "Active Cases") %>%
+#     addProviderTiles(providers$CartoDB.Positron,group = "Deaths") %>%
+#     addCircleMarkers(data= granData_deaths(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Deaths),
+#                      stroke = FALSE, fillOpacity = 0.5, color="red", group = "Deaths")%>%
+#     addProviderTiles(providers$CartoDB.Positron,group = "Confirmed Cases") %>%
+#     addCircleMarkers(data= granData_confirmed(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Confirmed),
+#                      stroke = FALSE, fillOpacity = 0.5, color="orange", group = "Confirmed Cases")%>%
+#     addProviderTiles(providers$CartoDB.Positron,group = "Recovered Cases") %>%
+#     addCircleMarkers(data= granData_recovered(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Recovered),
+#                      stroke = FALSE, fillOpacity = 0.5, color="green", group = "Recovered Cases")%>%
+#     addLayersControl(
+#       overlayGroups = c("Active Cases", "Deaths", "Confirmed Cases", "Recovered Cases"),
+#       options = layersControlOptions(collapsed = FALSE)
+#     )%>%
+#     hideGroup("Deaths")%>%
+#     hideGroup("Confirmed Cases")%>%
+#     hideGroup("Recovered Cases")
+# })
+# leafletOutput('map')
+
+labs <- lapply(seq(nrow(covidData)), function(i) {
+  paste0('<strong>',covidData[i, "Country.Region"],'<strong/>','<br/>', 
+          covidData[i, "Admin2"], ', ', 
+          covidData[i, "Province.State"],'<br>','<br>','Confirmed Cases: ' ,
+          covidData[i, "Confirmed"],'<br>','Recovered: ' ,
+          covidData[i,"Recovered"],'<br>','Deaths: ',covidData[i, "Deaths"],'<br>','Last Updated: ',covidData[i, "Last.Update"],'<br>',"US DOS Travel Advisory: ",covidData[i, "Advisory.Level"]) 
 })
-leafletOutput('map')
+
+qpal <- colorQuantile("YlOrRd", unclass(as.factor(covidData$Advisory.Level)), n = 4)
+data_Map <- WorldCountry[WorldCountry$name %in% covidData$Country.Region,]
+
+m <- leaflet(data = covidData,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>% setView(lng = -92 ,lat=26,zoom = 3)%>%
+    addProviderTiles(provider = providers$CartoDB.Positron)%>% addCircleMarkers(radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),label = lapply(labs, htmltools::HTML),labelOptions = labelOptions(clickable = T,textsize = "15px"))%>%setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 = 90)
+m  # Print the map
+
 ```
 
-Row {data-height=350}
+Column {data-width=300}
 -----------
+
+
+###
+
+```{r }
+
+reactive_case_count <- renderText({
+  paste0(prettyNum(sum(covidData$Confirmed), big.mark=","), " cases")
+})
+
+reactive_recovered_count <- renderText({
+  paste0(prettyNum(sum(covidData$Recovered), big.mark=","), " recovered")
+})
+
+reactive_active_count <- renderText({
+  paste0(prettyNum(sum(covidData$Active), big.mark=","), " active cases")
+})
+
+reactive_country_count <- renderText({
+  paste0(length(unique(covidData$Country.Region)), " countries/regions affected")
+})
+
+absolutePanel(id = "controls", class = "panel panel-default",fixed=TRUE, height = "auto",                                   h3(textOutput("reactive_case_count"), align = "right"),
+              h4(textOutput("reactive_death_count"), align = "right"),
+              span(h4(textOutput("reactive_recovered_count"), align = "right"), style="color:#006d2c"),
+              span(h4(textOutput("reactive_active_count"), align = "right"), style="color:#cc4c02"),
+              h6(textOutput("clean_date_reactive"), align = "right"),
+              h6(textOutput("reactive_country_count"), align = "right"),)
+
+```
+
+###
+
 ```{r }
 names(tsConfirmedData) <- gsub("X", "", names(tsConfirmedData))
 library(plyr)
