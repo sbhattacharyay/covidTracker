@@ -12,6 +12,9 @@ Department of Biomedical Engineering, Johns Hopkins University
 * Milken Institute COVID-19 Treatment and Vaccine Tracker: https://milkeninstitute.org/covid-19-tracker
 * Johns Hopkins University Center for Systems Science and Engineering (JHU CSSE): https://github.com/CSSEGISandData/COVID-19
 
+**COVID-19 App**
+*The purpose of this app is to display active cases, confirmed cases, deaths, and recovered cases of COVID-19, and to illustrate inter-country variations in the trend of confirmed COVID-19 cases. The data for this app was scraped from the data sources listed above.
+
 **Author Contributions:**
 * *Shubhayu*: Coded the data scraping component of the code and assembled data into data frames
 * *Eshan*: Coded the visualization of the data on the map and as plots
