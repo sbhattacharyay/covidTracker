@@ -13,7 +13,7 @@ output:
 
 ```{r global, include=FALSE}
 
-Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard")
+Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard","DT")
 lapply(Packages, library, character.only = TRUE)
 
 jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
@@ -276,21 +276,41 @@ inputPanel(actionButton("reset", "Reset to World"))
 Time-series Plots by Country
 =======================================
 
-###
+Column {data-width=350}
+-------------------------------------
+### Filter by Country:
 
+```{r }
+
+countryNames <- levels(covidData$Country.Region)
+
+inputPanel(h4('Select region of interest'), selectInput("countryChoice_ts", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
+
+```
+
+
+Column
+-------------------------------------
+### Confirmed Cases
 ```{r }
 names(tsConfirmedData) <- gsub("X", "", names(tsConfirmedData))
 library(plyr)
-tsConfirmedData<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum)) 
+tsConfirmedData_sum<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum)) 
 detach("package:plyr", unload = TRUE)
-tsConfirmedData<-tsConfirmedData[c(-2,-3)]
-tsConfirmedData<- tsConfirmedData[1:length(tsConfirmedData)-1]
+tsConfirmedData_sum<-tsConfirmedData_sum[c(-2,-3)]
+tsConfirmedData_sum<- tsConfirmedData_sum[1:length(tsConfirmedData_sum)-1]
+names(tsConfirmedData_sum)<-gsub("Country.Region", "Dates", names(tsConfirmedData_sum))
 ts_confirmed <- reactive({
   tsConfirmedData %>%
     filter(Country.Region==input$countryChoice) %>%
     tidyr::gather(Country.Region)
+  tsConfirmedData_sum %>%
+  filter(Dates==input$countryChoice_ts) %>%
+  tidyr::gather(Dates)%>%
+  mutate(Dates=format(as.POSIXct(as.Date(Dates, format="%m.%d.%y")+1),"%d %b %Y"))
 })
 
+#ts_confirmed()$Dates<-format(as.POSIXct(as.Date(ts_confirmed()$Dates, format="%m.%d.%y")),"%d %B %Y")
 
 renderPlotly({
   ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value)) +
@@ -303,6 +323,15 @@ renderPlotly({
     scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
     ylab('Number of Cases') + 
     xlab('Date')
+  ggplot(data=ts_confirmed(), aes(x=factor(Dates, levels=Dates),y=value)) +
+  geom_line()+
+  geom_point(colour = "blue")+
+  #ggtitle("Confirmed Cases") +
+  theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
+  ylab('Number of Cases') + 
+  xlab('Date')
 })
 
 
@@ -312,5 +341,48 @@ renderPlotly({
 
 Treatments and Vaccines
 =======================================
+Column {data-width=350}
+-------------------------------------
+### Vaccine or Treatment Data
 
+```{r}
+radioButtons("radio_select",NULL, c("Vaccine Data"="vaccineData","Treatment Data"="treatmentData"), selected = NULL, inline=T)
+vaccineData<-vaccineData%>%
+  select(-Number)%>%
+  rename("Type of Vaccine"= "Type.of.Vaccine", 
+                                      "Developer"= "Developer/.Researcher",
+                                      "Current Stage of Development"="Current.Stage.of.Development" ,
+                                      "Related Vaccine Platforms"="Related.Use/Platform",
+                                      "Funding Sources"="Funding.Sources",
+                                      "Anticipated Timing"="Anticipated.Timing",
+                                      "Data Sources"="Sources",
+                                      "Last Update"="Last.Update")
+treatmentData<-treatmentData%>%
+  select(-Number)%>%
+  rename("Type of Treatment"="Type.of.Product.-.Treatment",
+         "Indications of FDA Approval"="FDA-Approved.Indications.(Treatments)",
+         "Ongoing Clinical Trials for Other Diseases"="Clinical.Trials.Ongoing.for.Other.Diseases",
+         "Developer"="Developer/.Researcher",
+         "Current Stage of Development"="Current.Stage.of.Development",
+         "Funding Sources"="Funding.Sources",
+         "Anticipated Timing"="Anticipated.Timing",
+          "Data Sources"="Sources",
+           "Last Update"="Last.Update")
+  
+
+DT::renderDataTable({
+  data<-
+    switch(input$radio_select,"vaccineData"=vaccineData,"treatmentData"=treatmentData) %>%
+    discard(~all(is.na(.x)))
+  DT::datatable(data,extensions = 'FixedColumns',
+    options = list(
+    bPaginate = FALSE,
+    scrollX=TRUE,
+    scrollY=400,
+    fixedColumns = TRUE,
+    columnDefs = list(list(className = 'dt-center', targets = "_all"))),
+    rownames = FALSE,
+  )
+})
+```
 
