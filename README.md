@@ -1,4 +1,7 @@
 # 2019 Novel Coronavirus COVID-19 (2019-nCoV) Global Tracker
+
+https://sbhattacharyay.shinyapps.io/covidTracker_flexdashboard/
+
 Shubhayu Bhattacharyay, Eshan Joshi \
 Department of Biomedical Engineering, Johns Hopkins University
 
