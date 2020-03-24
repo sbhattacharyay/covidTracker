@@ -287,6 +287,7 @@ Column {data-width=350}
 
 ```{r }
 countryNames <- as.character(unique(covidData$Country.Region))
+
 inputPanel(h4('Select region of interest'), selectInput("countryChoice_ts", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
 ```
 
