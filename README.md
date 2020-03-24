@@ -13,7 +13,7 @@ Department of Biomedical Engineering, Johns Hopkins University
 * Johns Hopkins University Center for Systems Science and Engineering (JHU CSSE): https://github.com/CSSEGISandData/COVID-19
 
 **COVID-19 App Description**
-* The purpose of this app is to display active cases, confirmed cases, deaths, and recovered cases of COVID-19, and to illustrate inter-country variations in the trend of confirmed COVID-19 cases. The data for this app was scraped from the data sources listed above.
+* The purpose of this app is to display active cases, confirmed cases, deaths, and recovered cases of COVID-19, and to illustrate inter-country variations in the trend of confirmed COVID-19 cases. We also highlight recent treatments and vaccines in development to treat or prevent COVID-19. The data for this app was scraped from the data sources listed above.
 
 **Author Contributions:**
 * *Shubhayu*: Coded the data scraping component of the code and assembled data into data frames
