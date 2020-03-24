@@ -13,7 +13,7 @@ output:
 
 ```{r global, include=FALSE}
 
-Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard","DT")
+Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard","DT","geojsonio")
 lapply(Packages, library, character.only = TRUE)
 
 jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
@@ -125,10 +125,13 @@ col_order <- c("Admin2","Country.Region", "Province.State", "Last.Update","Confi
 covidData <- covidData[, col_order] 
 
 rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedData","tsDeathsData","tsRecoveredData")))
+
 ```
 
 Global Map
 =======================================
+
+
 Column {data-width=175}
 -------------------------------------
 
@@ -213,32 +216,34 @@ Column {data-width=650}
 
 ```{r }
 
-labs <- lapply(seq(nrow(covidData)), function(i) {
-    paste0('<strong>',covidData[i, "Country.Region"],'<strong/>','<br/>', 
-           covidData[i, "Admin2"], ', ', 
-           covidData[i, "Province.State"],'<br>','<br>','Confirmed Cases: ' ,
-           covidData[i, "Confirmed"],'<br>','Recovered: ' ,
-           covidData[i,"Recovered"],'<br>','Deaths: ',covidData[i, "Deaths"],'<br>','Last Updated: ',covidData[i, "Last.Update"],'<br>',"US DOS Travel Advisory: ",covidData[i, "Advisory.Level"]) })
+source('functions/correct_world_names.R')
+source('functions/produce_labels.R')
 
-v <- reactiveValues(data = covidData)
-w <- reactiveValues(labs = covidData)
+worldcountry = geojson_read("./countries.geo.json", what = "sp")
+worldcountry$name<-correct_world_names(worldcountry$name)
 
-observeEvent(input$countryChoice!="World", {
-  v$data <- covidData[covidData$Country.Region==input$countryChoice & covidData[,input$trackVar]>0,]
-  w$labs <- labs[covidData$Country.Region==input$countryChoice & covidData[,input$trackVar]>0]
-})
+mutualCountries <- worldcountry$name[worldcountry$name %in% covidData$Country.Region]
+advisoryFiltData <- filter(covidData,Country.Region %in% mutualCountries)
+# 
+# qpal <- colorFactor("YlOrRd", (as.factor(advisoryFiltData$Advisory.Level)))
+# polygons = worldcountry[worldcountry$name %in% covidData$Country.Region, ]
 
-observeEvent(input$countryChoice=="World", {
-  v$data <- covidData
-  w$labs <- labs
-})
-
-map <- renderLeaflet({
-  leaflet(data = v$data,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>% setView(lng = -92 ,lat=26,zoom = 3) %>% addProviderTiles(provider = providers$CartoDB.Positron)%>%setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 = 90)%>% addCircleMarkers(radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),label = lapply(w$labs, htmltools::HTML),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto")) 
-})
-leafletOutput('map')
-
-# }
+basemap<-leaflet(data = worldcountry,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>%
+  addProviderTiles(provider = providers$CartoDB.Positron) %>%
+  addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>%
+  hideGroup(c("Confirmed", "Recovered", "Deaths"))  %>%
+  setView(lng = -92 ,lat=26,zoom = 3) %>%
+  setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 =90)%>%
+  # addLegend("bottomright", pal = qpal, values = ~(as.factor(advisoryFiltData$Advisory.Level)), title = "<small>US DOS Travel Advisory Level</small>")%>%
+  addCircleMarkers(data = covidData,radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),color = "#662506",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Active")%>%
+  addCircleMarkers(data = covidData,radius=~log(Confirmed),lng = ~Longitude,lat = ~Latitude,weight = ~(Confirmed)**(1/3),color = "#cc4c02",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Confirmed")%>%
+  addCircleMarkers(data = covidData,radius=~log(Recovered),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#045a8d",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Recovered")%>%
+  addCircleMarkers(data = covidData,radius=~log(Deaths),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#4d004b",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Deaths")
+# # 
+# # %>%addPolygons(data=polygons,stroke = F, smoothFactor = 0.1, fillOpacity = 1, fillColor = ~qpal(as.factor(as.factor(advisoryFiltData$Advisory.Level))))
+# 
+# 
+basemap
 
 ```
 
@@ -281,11 +286,8 @@ Column {data-width=350}
 ### Filter by Country:
 
 ```{r }
-
-countryNames <- levels(covidData$Country.Region)
-
+countryNames <- as.character(unique(covidData$Country.Region))
 inputPanel(h4('Select region of interest'), selectInput("countryChoice_ts", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
-
 ```
 
 
@@ -309,20 +311,8 @@ ts_confirmed <- reactive({
   tidyr::gather(Dates)%>%
   mutate(Dates=format(as.POSIXct(as.Date(Dates, format="%m.%d.%y")+1),"%d %b %Y"))
 })
-
 #ts_confirmed()$Dates<-format(as.POSIXct(as.Date(ts_confirmed()$Dates, format="%m.%d.%y")),"%d %B %Y")
-
 renderPlotly({
-  ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value)) +
-    geom_line()+
-    geom_point()+
-    ggtitle("Confirmed Cases") +
-    theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(),panel.background = element_blank(), 
-          axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
-    scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
-    ylab('Number of Cases') + 
-    xlab('Date')
   ggplot(data=ts_confirmed(), aes(x=factor(Dates, levels=Dates),y=value)) +
   geom_line()+
   geom_point(colour = "blue")+
@@ -333,9 +323,6 @@ renderPlotly({
   ylab('Number of Cases') + 
   xlab('Date')
 })
-
-
-
 ```
 
 
@@ -369,7 +356,6 @@ treatmentData<-treatmentData%>%
           "Data Sources"="Sources",
            "Last Update"="Last.Update")
   
-
 DT::renderDataTable({
   data<-
     switch(input$radio_select,"vaccineData"=vaccineData,"treatmentData"=treatmentData) %>%
@@ -380,9 +366,8 @@ DT::renderDataTable({
     scrollX=TRUE,
     scrollY=400,
     fixedColumns = TRUE,
-    columnDefs = list(list(className = 'dt-center', targets = "_all"))),
+    columnDefs = list(list(className = 'dt-left', targets = "_all"))),
     rownames = FALSE,
   )
 })
 ```
-
