@@ -1,8 +1,11 @@
 ---
 title: "COVID-19 Tracker"
-author: "Shubhayu Bhattacharyay, Eshan Joshi"
-date: "3/20/2020"
-output: flexdashboard::flex_dashboard
+#author: "Shubhayu Bhattacharyay, Eshan Joshi"
+date: "Last updated: 3/23/2020"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+theme: readable
 runtime: shiny
 ---
 
@@ -122,20 +125,95 @@ covidData <- covidData[, col_order]
 rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedData","tsDeathsData","tsRecoveredData")))
 ```
 
-Column {.sidebar}
------------------------------------------------------------------------
 
-### Select Data Type and Level
+Map
+=======================================
+input {.sidebar}
+----------
+```{r }
+countryName <- levels(covidData$Country.Region)
+inputPanel(h3('Some Title')) 
+inputPanel(h4('Select locations of interest'), selectInput("countryChoice", label = "Country or Region", choices = countryName, selected = FALSE, width=180))
+```
 
-```{r}
+Row {data-height=650}
+----------
+```{r }
+granData_active <- reactive({
+  filter(covidData,Country.Region==input$countryChoice & Active>0)
+})
+
+granData_deaths <- reactive({
+  filter(covidData,Country.Region==input$countryChoice & Deaths>0)
+})
+
+granData_confirmed <- reactive({
+  filter(covidData,Country.Region==input$countryChoice & Confirmed>0)
+})
+
+granData_recovered<- reactive({
+  filter(covidData,Country.Region==input$countryChoice & Recovered>0)
+})
+
+output$map <- renderLeaflet({leaflet(granData_active()) %>%
+    addTiles(group = "Active Cases") %>%
+    addCircleMarkers(data= granData_active(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Active),
+    stroke = FALSE, fillOpacity = 0.5, group = "Active Cases") %>%
+    addTiles(group = "Deaths") %>%
+    addCircleMarkers(data= granData_deaths(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Deaths),
+    stroke = FALSE, fillOpacity = 0.5, color="red", group = "Deaths")%>%
+    addTiles(group = "Confirmed Cases") %>%
+    addCircleMarkers(data= granData_confirmed(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Confirmed),
+    stroke = FALSE, fillOpacity = 0.5, color="orange", group = "Confirmed Cases")%>%
+    addTiles(group = "Recovered Cases") %>%
+    addCircleMarkers(data= granData_recovered(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Recovered),
+    stroke = FALSE, fillOpacity = 0.5, color="green", group = "Recovered Cases")%>%
+    addLayersControl(
+    overlayGroups = c("Active Cases", "Deaths", "Confirmed Cases", "Recovered Cases"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+    hideGroup("Deaths")%>%
+    hideGroup("Confirmed Cases")%>%
+    hideGroup("Recovered Cases")
+})
+leafletOutput('map')
+```
+
+Row {data-height=350}
+-----------
+```{r }
+names(tsConfirmedData) <- gsub("X", "", names(tsConfirmedData))
+tsConfirmedData<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum)) 
+tsConfirmedData<-tsConfirmedData[c(-2,-3)]
+tsConfirmedData<- tsConfirmedData[1:length(tsConfirmedData)-1]
+ts_confirmed <- reactive({
+  tsConfirmedData %>%
+  filter(Country.Region==input$countryChoice) %>%
+  tidyr::gather(Country.Region)
+})
+
+
+renderPlotly({
+  ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value, color="black")) +
+  geom_line()+
+  geom_point()+
+  ggtitle("Confirmed Cases") +
+  theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
+  scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
+  ylab('Number of Cases') + 
+  xlab('Date')
+})
+  
 
 ```
 
-Column
------------------------------------------------------------------------
 
-### Average Composition Plot
+Statistics
+=======================================
 
-```{r}
+About
+=======================================
 
-```
+
