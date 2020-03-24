@@ -115,7 +115,7 @@ sk_table<-merge(sk_table,sk_coords,by = c("Province.State"),all=TRUE)%>%mutate(C
 
 covidData<-rbind(jhuData,italy_table,sk_table)%>%merge(.,advisory,by = c("Country.Region"),all=T) %>% drop_na(Confirmed)
 new_adv <- rename(advisory, Province.State = Country.Region)
-covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)%>%.[!(.$Country.Region=="Italy" & .$Source=="Johns Hopkins University CSSE") & !(.$Country.Region=="Korea, South" & .$Source=="Johns Hopkins University CSSE"),] 
+covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)%>%.[!(.$Country.Region=="Italy" & .$Source=="Johns Hopkins University CSSE") & !(.$Country.Region=="Korea, South" & .$Source=="Johns Hopkins University CSSE"),] %>% mutate(Country.Region=as.character(Country.Region))
 
 covidData[is.na(covidData$Active),"Active"]<-covidData[is.na(covidData$Active),"Confirmed"]
 
@@ -129,42 +129,8 @@ rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedDa
 
 Global Map
 =======================================
-Column {data-width=350}
+Column {data-width=175}
 -------------------------------------
-
-### Active Cases
-
-```{r }
-
-valueBox(paste0(prettyNum(sum(covidData$Active), big.mark=",")),"global",width=NULL,color="aqua")
-
-```
-
-### Confirmed Cases
-
-```{r }
-
-valueBox(paste0(prettyNum(sum(covidData$Confirmed), big.mark=",")),"global",width=NULL,color="aqua")
-
-```
-
-### Deaths
-
-```{r }
-
-valueBox(paste0(prettyNum(sum(covidData$Deaths), big.mark=",")),"global",width=NULL,color="aqua")
-
-```
-
-### Filter by Country:
-
-```{r }
-
-countryNames <- levels(covidData$Country.Region)
-
-inputPanel(h4('Select locations of interest'), selectInput("countryChoice", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
-
-```
 
 ### Last Update (GMT):
 
@@ -173,70 +139,139 @@ inputPanel(h4('Select locations of interest'), selectInput("countryChoice", labe
 valueBox(`attr<-`(Sys.time(),"tzone","GMT"),"",icon = icon("calendar"),width=NULL,color="aqua")
 ```
 
-Column {data-width=650}
--------------------------------------
-
-### Active Cases by Location
+### Active Cases
 
 ```{r }
-granData_active <- reactive({
-  filter(covidData,Country.Region==input$countryChoice & Active>0)
+
+renderValueBox({
+  if (input$countryChoice == "World"){
+    val<-sum(covidData$Active,na.rm = T)
+  } else {
+    filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
+    val<-sum(filtData$Active,na.rm = T)
+  }
+  valueBox(val,input$countryChoice,width=NULL,color="aqua")
 })
-
-granData_deaths <- reactive({
-  filter(covidData,Country.Region==input$countryChoice & Deaths>0)
-})
-
-granData_confirmed <- reactive({
-  filter(covidData,Country.Region==input$countryChoice & Confirmed>0)
-})
-
-granData_recovered<- reactive({
-  filter(covidData,Country.Region==input$countryChoice & Recovered>0)
-})
-
-WorldCountry <-geojsonio::geojson_read("./countries.geo.json", what = "sp")
-
-# output$map <- renderLeaflet({leaflet(granData_active()) %>%
-#     addProviderTiles(providers$CartoDB.Positron,group = "Active Cases") %>%
-#     addCircleMarkers(data= granData_active(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Active),
-#                      stroke = FALSE, fillOpacity = 0.5, group = "Active Cases") %>%
-#     addProviderTiles(providers$CartoDB.Positron,group = "Deaths") %>%
-#     addCircleMarkers(data= granData_deaths(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Deaths),
-#                      stroke = FALSE, fillOpacity = 0.5, color="red", group = "Deaths")%>%
-#     addProviderTiles(providers$CartoDB.Positron,group = "Confirmed Cases") %>%
-#     addCircleMarkers(data= granData_confirmed(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Confirmed),
-#                      stroke = FALSE, fillOpacity = 0.5, color="orange", group = "Confirmed Cases")%>%
-#     addProviderTiles(providers$CartoDB.Positron,group = "Recovered Cases") %>%
-#     addCircleMarkers(data= granData_recovered(), lng = ~Longitude, lat = ~Latitude, radius = ~log(Recovered),
-#                      stroke = FALSE, fillOpacity = 0.5, color="green", group = "Recovered Cases")%>%
-#     addLayersControl(
-#       overlayGroups = c("Active Cases", "Deaths", "Confirmed Cases", "Recovered Cases"),
-#       options = layersControlOptions(collapsed = FALSE)
-#     )%>%
-#     hideGroup("Deaths")%>%
-#     hideGroup("Confirmed Cases")%>%
-#     hideGroup("Recovered Cases")
-# })
-# leafletOutput('map')
-
-labs <- lapply(seq(nrow(covidData)), function(i) {
-  paste0('<strong>',covidData[i, "Country.Region"],'<strong/>','<br/>', 
-          covidData[i, "Admin2"], ', ', 
-          covidData[i, "Province.State"],'<br>','<br>','Confirmed Cases: ' ,
-          covidData[i, "Confirmed"],'<br>','Recovered: ' ,
-          covidData[i,"Recovered"],'<br>','Deaths: ',covidData[i, "Deaths"],'<br>','Last Updated: ',covidData[i, "Last.Update"],'<br>',"US DOS Travel Advisory: ",covidData[i, "Advisory.Level"]) 
-})
-
-qpal <- colorQuantile("YlOrRd", unclass(as.factor(covidData$Advisory.Level)), n = 4)
-data_Map <- WorldCountry[WorldCountry$name %in% covidData$Country.Region,]
-
-m <- leaflet(data = covidData,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>% setView(lng = -92 ,lat=26,zoom = 3)%>%
-    addProviderTiles(provider = providers$CartoDB.Positron)%>% addCircleMarkers(radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),label = lapply(labs, htmltools::HTML),labelOptions = labelOptions(clickable = T,textsize = "15px"))%>%setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 = 90)
-m  # Print the map
 
 ```
 
+### Confirmed Cases
+
+```{r }
+
+renderValueBox({
+  if (input$countryChoice == "World"){
+    val<-sum(covidData$Confirmed,na.rm = T)
+  } else {
+    filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
+    val<-sum(filtData$Confirmed,na.rm = T)
+  }
+  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+})
+
+
+```
+
+### Deaths
+
+```{r }
+
+renderValueBox({
+  if (input$countryChoice == "World"){
+    val<-sum(covidData$Deaths,na.rm = T)
+  } else {
+    filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
+    val<-sum(filtData$Deaths,na.rm = T)
+  }
+  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+})
+
+
+```
+
+### Recovered
+
+```{r }
+
+renderValueBox({
+  if (input$countryChoice == "World"){
+    val<-sum(covidData$Recovered,na.rm = T)
+  } else {
+    filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
+    val<-sum(filtData$Recovered,na.rm = T)
+  }
+  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+})
+
+```
+
+
+Column {data-width=650}
+-------------------------------------
+
+### Cases by Geographical Location
+
+```{r }
+
+labs <- lapply(seq(nrow(covidData)), function(i) {
+    paste0('<strong>',covidData[i, "Country.Region"],'<strong/>','<br/>', 
+           covidData[i, "Admin2"], ', ', 
+           covidData[i, "Province.State"],'<br>','<br>','Confirmed Cases: ' ,
+           covidData[i, "Confirmed"],'<br>','Recovered: ' ,
+           covidData[i,"Recovered"],'<br>','Deaths: ',covidData[i, "Deaths"],'<br>','Last Updated: ',covidData[i, "Last.Update"],'<br>',"US DOS Travel Advisory: ",covidData[i, "Advisory.Level"]) })
+
+v <- reactiveValues(data = covidData)
+w <- reactiveValues(labs = covidData)
+
+observeEvent(input$countryChoice!="World", {
+  v$data <- covidData[covidData$Country.Region==input$countryChoice & covidData[,input$trackVar]>0,]
+  w$labs <- labs[covidData$Country.Region==input$countryChoice & covidData[,input$trackVar]>0]
+})
+
+observeEvent(input$countryChoice=="World", {
+  v$data <- covidData
+  w$labs <- labs
+})
+
+map <- renderLeaflet({
+  leaflet(data = v$data,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>% setView(lng = -92 ,lat=26,zoom = 3) %>% addProviderTiles(provider = providers$CartoDB.Positron)%>%setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 = 90)%>% addCircleMarkers(radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),label = lapply(w$labs, htmltools::HTML),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto")) 
+})
+leafletOutput('map')
+
+# }
+
+```
+
+
+Column {data-width=175}
+-------------------------------------
+
+### 1.) Select Variable to Track
+
+```{r }
+
+inputPanel(radioButtons("trackVar", label="COVID-19 Cases:",choices = list("Active","Confirmed","Deaths","Recovered")))
+
+```
+
+### 2.) Filter by Country or Region:
+
+```{r }
+
+countryNames <- as.list(prepend(as.character(unique(covidData$Country.Region)),"World"))
+
+inputPanel(selectInput("countryChoice", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
+
+```
+
+### 3.) Submit or Reset Changes to World
+
+```{r }
+
+inputPanel(actionButton("submit", "Submit"))
+inputPanel(actionButton("reset", "Reset to World"))
+
+```
 
 Time-series Plots by Country
 =======================================
@@ -252,24 +287,25 @@ tsConfirmedData<-tsConfirmedData[c(-2,-3)]
 tsConfirmedData<- tsConfirmedData[1:length(tsConfirmedData)-1]
 ts_confirmed <- reactive({
   tsConfirmedData %>%
-  filter(Country.Region==input$countryChoice) %>%
-  tidyr::gather(Country.Region)
+    filter(Country.Region==input$countryChoice) %>%
+    tidyr::gather(Country.Region)
 })
 
 
 renderPlotly({
   ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value)) +
-  geom_line()+
-  geom_point()+
-  ggtitle("Confirmed Cases") +
-  theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),panel.background = element_blank(), 
-        axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
-  scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
-  ylab('Number of Cases') + 
-  xlab('Date')
+    geom_line()+
+    geom_point()+
+    ggtitle("Confirmed Cases") +
+    theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),panel.background = element_blank(), 
+          axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
+    scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
+    ylab('Number of Cases') + 
+    xlab('Date')
 })
-  
+
+
 
 ```
 
