@@ -282,7 +282,7 @@ Column {data-width=350}
 
 ```{r }
 
-countryNames <- levels(covidData$Country.Region)
+countryNames <- as.character(unique(covidData$Country.Region))
 
 inputPanel(h4('Select region of interest'), selectInput("countryChoice_ts", label = "Country or Region", choices = countryNames, selected = FALSE, width=180))
 
@@ -313,16 +313,6 @@ ts_confirmed <- reactive({
 #ts_confirmed()$Dates<-format(as.POSIXct(as.Date(ts_confirmed()$Dates, format="%m.%d.%y")),"%d %B %Y")
 
 renderPlotly({
-  ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value)) +
-    geom_line()+
-    geom_point()+
-    ggtitle("Confirmed Cases") +
-    theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(),panel.background = element_blank(), 
-          axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
-    scale_y_continuous(expand = c(0, 0))+ #limits = c(0,1),
-    ylab('Number of Cases') + 
-    xlab('Date')
   ggplot(data=ts_confirmed(), aes(x=factor(Dates, levels=Dates),y=value)) +
   geom_line()+
   geom_point(colour = "blue")+
