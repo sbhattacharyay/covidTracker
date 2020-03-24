@@ -331,7 +331,7 @@ DT::renderDataTable({
     scrollX=TRUE,
     scrollY=400,
     fixedColumns = TRUE,
-    columnDefs = list(list(className = 'dt-center', targets = "_all"))),
+    columnDefs = list(list(className = 'dt-left', targets = "_all"))),
     rownames = FALSE,
   )
 })
