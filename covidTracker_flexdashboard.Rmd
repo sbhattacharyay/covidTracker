@@ -55,7 +55,8 @@ unzip(zipfile = "covid-master.zip")
 setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
 datFileList <- sort(list.files(pattern = "\\.csv$"))
 lastFile <- tail(datFileList, n = 1)
-jhuData <- read.csv(file = lastFile) %>% mutate(Last.Update=as.character(Last.Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%dT%H:%M:%S",locale = locale(tz="GMT"))) %>% mutate(Source = "Johns Hopkins University CSSE")
+
+jhuData <- read.csv(file = lastFile) %>% mutate(Last.Update=as.character(Last_Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%d %H:%M:%S",locale = locale(tz="GMT"))) %>% mutate(Source = "Johns Hopkins University CSSE") %>% rename(Province.State=Province_State,Country.Region=Country_Region,Latitude=Lat, Longitude=Long_) %>% select(Admin2,Province.State,Country.Region,Confirmed,Recovered,Deaths,Active,Latitude,Longitude,Source,Last.Update)
 
 setwd("../csse_covid_19_time_series")
 
@@ -110,8 +111,10 @@ italy_dateTim_updated <- italy_web %>%
 italy_dateTim_updated <- sub(".*: ", "", italy_dateTim_updated)
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
-output <- extract_tables(italy_pdf_link,output = "data.frame", dec=",")
-italy_table <- do.call(rbind, output) %>% select(c(1,6,7,8))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4) %>% filter(Confirmed != "") %>% head(-1) 
+#output <- extract_tables(italy_pdf_link,output = "data.frame", dec=",")
+
+italy_table <- read.csv("italy_data/italy.csv",dec=",")%>% select(c(1,6,7,8))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4) %>% filter(Confirmed != "") %>% head(-1) %>% tail(-1) %>% mutate(Admin2="")
+
 rownames(italy_table) <- c()
 italy_table$Last.Update <- rep(parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),nrow(italy_table))
 italy_table$Source <- rep("Ministry of Health of Italy",nrow(italy_table))
@@ -125,14 +128,19 @@ italy_table[bolIdx,]$Country.Region <- 'Italy'
 italy_table[bolIdx,]$Longitude <-11.35
 italy_table[bolIdx,]$Latitude <- 46.5
 
+italy_table[, c("Confirmed","Recovered","Deaths")]<- sapply(italy_table[, c("Confirmed","Recovered","Deaths")], as.numeric)
+italy_table <-mutate(italy_table,Active=Confirmed-Deaths-Recovered)
+
 # South Korea (보건복지부) Regional Data Scraping
 sk_link <-'http://ncov.mohw.go.kr/bdBoardList_Real.do?brdId=1&brdGubun=13&ncvContSeq=&contSeq=&board_id=&gubun='
-sk_table<-htmltab(sk_link)%>%tail(-1)%>%rename(Province.State=1,New.Cases=2,Confirmed=3,Recovered=4,Deaths=5,Incidence.Rate=6)%>%mutate(Province.State=c("Seoul","Busan","Daegu","Incheon","Gwangju","Daejeon","Ulsan","Sejong","Gyeonggi-do","Gangwon","Chungbuk","Chungnam","Jeonbuk","Jeonnam","Gyeongbuk","Gyeongnam","Jeju","Quarantined"))%>%select(Province.State,New.Cases,Confirmed,Recovered,Deaths)%>%mutate(Source="Ministry of Health and Welfare of the Republic of Korea")
+sk_table<-htmltab(sk_link)%>%tail(-1)%>%rename(Province.State=1,New.Cases=2,Confirmed=3,Recovered=4,Deaths=5,Incidence.Rate=6)%>%mutate(Province.State=c("Seoul","Busan","Daegu","Incheon","Gwangju","Daejeon","Ulsan","Sejong","Gyeonggi-do","Gangwon","Chungbuk","Chungnam","Jeonbuk","Jeonnam","Gyeongbuk","Gyeongnam","Jeju","Quarantined"))%>%select(Province.State,New.Cases,Confirmed,Recovered,Deaths)%>%mutate(Source="Ministry of Health and Welfare of the Republic of Korea")%>%mutate(Admin2="")
+
+sk_table[, c("Confirmed","Recovered","Deaths")]<- sapply(sk_table[, c("Confirmed","Recovered","Deaths")], as.numeric)
 
 sk_keep <- sk_table[,c("Province.State","New.Cases")] %>% mutate(Country.Region="Korea, South")
 newDayData <- merge(newDayData,sk_keep,by = c("Province.State","Country.Region","New.Cases"),all=T)
 
-sk_table<-select(sk_table,Province.State,Confirmed,Recovered,Deaths,Source)
+sk_table<-select(sk_table,Province.State,Confirmed,Recovered,Deaths,Source, Admin2)%>%mutate(Active=Confirmed-Deaths-Recovered)
 
 sk_web <- read_html(sk_link)
 sk_dateTim_updated <- sk_web %>% 
@@ -182,15 +190,16 @@ covidData<-merge(covidData,advisory,by = c("Country.Region"),all=T) %>% drop_na(
 new_adv <- rename(advisory, Province.State = Country.Region)
 covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)
 
-covidData[, c("Confirmed","Recovered","Deaths")] <- sapply(covidData[, c("Confirmed","Recovered","Deaths")], as.numeric)
+#covidData[, c("Confirmed","Recovered","Deaths")] <- sapply(covidData[, c("Confirmed","Recovered","Deaths")], as.numeric)
 covidData <- arrange(covidData,desc(Confirmed))
-covidData <- covidData[!(covidData$Country.Region=="Italy" & covidData$Source=="Johns Hopkins University CSSE") & !(covidData$Country.Region=="Korea, South" & covidData$Source=="Johns Hopkins University CSSE"),] %>% mutate(Active = Confirmed - Recovered - Deaths)
+covidData <- covidData[!(covidData$Country.Region=="Italy" & covidData$Source=="Johns Hopkins University CSSE") & !(covidData$Country.Region=="Korea, South" & covidData$Source=="Johns Hopkins University CSSE"),] 
+
 covidData[is.na(covidData$Active),"Active"]<-covidData[is.na(covidData$Active),"Confirmed"]
 covidData<-merge(covidData,newDayData,by=c("Province.State","Country.Region"),all=T) %>% drop_na(Confirmed)
 
 covidData<-arrange(covidData,desc(Active))
 
-col_order <- c("Country.Region", "Province.State", "Last.Update","Confirmed","Recovered","Deaths","Active","New.Cases","New.Deaths","New.Recovered","Advisory.Level","Advisory.DateUpdated","Latitude","Longitude","Source")
+col_order <- c("Admin2","Country.Region", "Province.State", "Last.Update","Confirmed","Recovered","Deaths","Active","New.Cases","New.Deaths","New.Recovered","Advisory.Level","Advisory.DateUpdated","Latitude","Longitude","Source")
 covidData <- covidData[, col_order] 
 
 rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedData","tsDeathsData","tsRecoveredData")))
