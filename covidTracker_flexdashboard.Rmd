@@ -183,7 +183,9 @@ Row {data-height=350}
 -----------
 ```{r }
 names(tsConfirmedData) <- gsub("X", "", names(tsConfirmedData))
+library(plyr)
 tsConfirmedData<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum)) 
+detach("package:plyr", unload = TRUE)
 tsConfirmedData<-tsConfirmedData[c(-2,-3)]
 tsConfirmedData<- tsConfirmedData[1:length(tsConfirmedData)-1]
 ts_confirmed <- reactive({
@@ -194,7 +196,7 @@ ts_confirmed <- reactive({
 
 
 renderPlotly({
-  ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value, color="black")) +
+  ggplot(data=ts_confirmed(), aes(x=as.character(Country.Region),y=value)) +
   geom_line()+
   geom_point()+
   ggtitle("Confirmed Cases") +
