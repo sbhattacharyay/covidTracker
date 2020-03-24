@@ -8,119 +8,70 @@ runtime: shiny
 
 ```{r global, include=FALSE}
 
-library(shiny)
-library(magrittr)
-library(dplyr)
-library(httr)
-library(ggplot2)
-library(plotly)
-library(rvest)
-# library(tabulizerjars)
-library(tabulizer)
-# library(tabula)
-# library(tabularaster)
-library(XML)
-library(xml2)
-library(htmltab)
-library(tidyverse)
-library(readr)
-library(pdftools)
-library(tesseract)
-library(openxlsx)
+Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx")
+lapply(Packages, library, character.only = TRUE)
 
-convertItalyNames <- function(provinceNames) {
-  new_provinceNames = provinceNames
-  for (i in 1:length(provinceNames)){
-    if (provinceNames[i] == 'Emilia-Romagna') {
-      new_provinceNames[i] <- 'Emilia Romagna'
-    } else if (provinceNames[i] == 'Friuli-Venezia Giulia') {
-      new_provinceNames[i] <- 'Friuli V.G.'
-    } else if (provinceNames[i] == 'Lombardy') {
-      new_provinceNames[i] <- 'Lombardia'
-    } else if (provinceNames[i] == 'Piedmont') {
-      new_provinceNames[i] <- 'Piemonte'
-    } else if (provinceNames[i] == 'Trentino-Alto Adige') {
-      new_provinceNames[i] <- 'Trento'
-    } else if (provinceNames[i] == 'Tuscany') {
-      new_provinceNames[i] <- 'Toscana'
-    } else if (provinceNames[i] == 'Valle dâ€™Aosta') {
-      new_provinceNames[i] <- 'Valle d\'Aosta'
-    }
-  }
-  return(new_provinceNames)
-}
+jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
+csvFiles<-sort(xpathSApply(htmlParse(jhuCSSE), "//a[contains(@class,'js-navigation-open')]/@href"))
+githubLink<-paste("https://raw.githubusercontent.com",csvFiles[tail(grep("*.csv",csvFiles),n=1)],sep = "")%>%str_remove("/blob")
 
-download.file(url = "https://github.com/CSSEGISandData/COVID-19/archive/master.zip", destfile = "covid-master.zip")
-unzip(zipfile = "covid-master.zip")
-setwd("./COVID-19-master/csse_covid_19_data/csse_covid_19_daily_reports")
-datFileList <- sort(list.files(pattern = "\\.csv$"))
-lastFile <- tail(datFileList, n = 1)
+jhuData <- read.csv(githubLink) %>% mutate(Last.Update=as.character(Last_Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%d %H:%M:%S",locale = locale(tz="GMT")),Active=Confirmed-Deaths-Recovered) %>% mutate(Source = "Johns Hopkins University CSSE") %>% rename(Province.State=Province_State,Country.Region=Country_Region,Latitude=Lat, Longitude=Long_) %>% select(Admin2,Province.State,Country.Region,Confirmed,Recovered,Deaths,Active,Latitude,Longitude,Source,Last.Update)
 
-jhuData <- read.csv(file = lastFile) %>% mutate(Last.Update=as.character(Last_Update)) %>% mutate(Last.Update=parse_datetime(Last.Update,format="%Y-%m-%d %H:%M:%S",locale = locale(tz="GMT"))) %>% mutate(Source = "Johns Hopkins University CSSE") %>% rename(Province.State=Province_State,Country.Region=Country_Region,Latitude=Lat, Longitude=Long_) %>% select(Admin2,Province.State,Country.Region,Confirmed,Recovered,Deaths,Active,Latitude,Longitude,Source,Last.Update)
 
-setwd("../csse_covid_19_time_series")
+jhuCSSE2 <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series')
+csvFiles<-sort(xpathSApply(htmlParse(jhuCSSE2), "//a[contains(@class,'js-navigation-open')]/@href"))
 
-tsConfirmedData <- read.csv(list.files(pattern = "\\Confirmed.csv$")) %>% rename(Latitude = Lat, Longitude = Long)%>%mutate(New.Cases = .[[ncol(.)]] - .[[ncol(.)-1]])
-tsDeathsData <- read.csv(list.files(pattern = "\\Deaths.csv$")) %>% rename(Latitude = Lat, Longitude = Long)%>%mutate(New.Deaths = .[[ncol(.)]] - .[[ncol(.)-1]])
-tsRecoveredData <- read.csv(list.files(pattern = "\\Recovered.csv$")) %>% rename(Latitude = Lat, Longitude = Long)%>%mutate(New.Recovered = .[[ncol(.)]] - .[[ncol(.)-1]])
+githubLinkConfirmed<-paste("https://raw.githubusercontent.com",csvFiles[grep("*confirmed_global.csv",csvFiles)],sep = "")%>%str_remove("/blob")
 
-newDayData <- merge(tsConfirmedData,tsDeathsData,by=c("Province.State","Country.Region"),all=T) 
-newDayData <- merge(newDayData,tsRecoveredData,by=c("Province.State","Country.Region"),all=T) %>% select(Province.State,Country.Region,New.Cases,New.Deaths,New.Recovered)
+githubLinkDeaths<-paste("https://raw.githubusercontent.com",csvFiles[grep("*deaths_global.csv",csvFiles)],sep = "")%>%str_remove("/blob")
 
-setwd("..")
-setwd("..")
-setwd("..")
+tsConfirmedData <- read.csv(githubLinkConfirmed) %>% rename(Latitude = Lat, Longitude = Long)%>%mutate(New.Cases = .[[ncol(.)]] - .[[ncol(.)-1]])
+tsDeathsData <- read.csv(githubLinkDeaths) %>% rename(Latitude = Lat, Longitude = Long)%>%mutate(New.Deaths = .[[ncol(.)]] - .[[ncol(.)-1]])
+
+newDayData <- merge(tsConfirmedData,tsDeathsData,by=c("Province.State","Country.Region"),all=T) %>% select(Province.State,Country.Region,New.Cases,New.Deaths)
 
 # COVID Treatment and Vaccine Data
 
-milken_vac_link <- 'https://milkeninstitute.org/covid-19-tracker'
-milken_web <- read_html(milken_vac_link)
-milken_vac_pdfLink<-xpathSApply(htmlParse(milken_web), "//a[contains(@style,'color: #ffffff; text-decoration: none;')]/@href")
-pngfile<-pdf_convert(milken_vac_pdfLink,dpi=600,pages = 1)
-rawText<-ocr(pngfile)
-updateTime<-sub(".*Updated ", "", rawText) %>% substr(1,nchar(.)-1)%>%parse_datetime(format="%B %d, %Y, at %I:%M p.m.",locale = locale(tz="America/New_York"))
+path_to_milken_pdf <- './data/vaccine_and_treatment_data/milken_tracker_data.pdf'
+path_to_milken_xlsx <- './data/vaccine_and_treatment_data/milken_tracker_data.xlsx'
+updateTime<-sub(".*Updated ", "", pdf_text(path_to_milken_pdf))[1]%>% substr(1,nchar(.)-1)%>%parse_datetime(format="%B %d, %Y, at %I:%M p.m.",locale = locale(tz="America/New_York"))
 
-treatmentData<-read.xlsx("Covid19 Tracker_WEB.xlsx",sheet=1)%>%rename(Type.of.Product=1,Developer.Organization=2,Current.Stage.of.Development=3,Funding.Sources=4,Anticipated.Timing=5,Comments=6,Source=7,Links=8)%>%select(Type.of.Product,Developer.Organization,Current.Stage.of.Development,Funding.Sources,Anticipated.Timing,Comments,Source,Links)%>%drop_na(Developer.Organization)%>%filter(Type.of.Product!="Type of Product",Developer.Organization!="Developer Organization",Current.Stage.of.Development!="Current Stage of Development")%>%mutate(Last.Update=updateTime)
+treatmentData<-read.xlsx(path_to_milken_xlsx,sheet=1,startRow=10)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Product.-.Treatment")
 
-vaccineData<-read.xlsx("Covid19 Tracker_WEB.xlsx",sheet=2)%>%rename(Type.of.Product=1,Developer.Organization=2,Current.Stage.of.Development=3,Funding.Sources=4,Anticipated.Timing=5,Comments=6,Source=7,Links=8)%>%select(Type.of.Product,Developer.Organization,Current.Stage.of.Development,Funding.Sources,Anticipated.Timing,Comments,Source,Links)%>%drop_na(Developer.Organization)%>%filter(Type.of.Product!="Type of Product",Developer.Organization!="Developer Organization",Current.Stage.of.Development!="Current Stage of Development")%>%mutate(Last.Update=updateTime)
+vaccineData<-read.xlsx(path_to_milken_xlsx,sheet=2,startRow=2)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Vaccine")
 
 # US Department of State Travel Advisory
-loc <-
+source("./functions/convertAdvisoryNames.R")
+
+travelLink <-
   'https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/'
-advisory <-
-  htmltab(loc) %>% mutate(Advisory = str_remove_all(Advisory, " Travel Advisory")) %>% rename(Country.Region = Advisory) %>% rename(Advisory.Level = Level) %>% rename(Advisory.DateUpdated = 'Date Updated')
-advisory[151,1]="Taiwan*"
-advisory[85,1]="Saint Vincent and the Grenadines"
-advisory[107,1]="Kyrgyzstan"
-advisory[104,1]="Korea, South"
-advisory[98,1]="Israel"
-advisory[205,1]="Gambia, The"
-advisory[43,1]="Czechia"
-advisory[208,1]="Congo (Kinshasa)"
-advisory[209,1]="Congo (Brazzaville)"
-advisory[177,1]="Bahamas, The"
+advisory <-htmltab(travelLink,which = 1) %>% mutate(Advisory = str_remove_all(Advisory, " Travel Advisory")) %>% rename(Country.Region = Advisory,Advisory.Level = Level,Advisory.DateUpdated = 'Date Updated') %>% convertAdvisoryNames(.)
 
 # Italy (Ministero della Salute) Regional Data Scraping
+
+source("./functions/convertItalyNames.R")
+
 italy_Link <-
   'http://www.salute.gov.it/portale/nuovocoronavirus/dettaglioContenutiNuovoCoronavirus.jsp?lingua=italiano&id=5351&area=nuovoCoronavirus&menu=vuoto'
 italy_web <- read_html(italy_Link)
+
 italy_dateTim_updated <- italy_web %>% 
   rvest::html_nodes('body') %>% 
   xml2::xml_find_all("//h4[contains(@class, 'blu-italia-base-color') and contains(@style,'font-size:24px;margin:0;')]") %>% 
-  rvest::html_text()
-italy_dateTim_updated <- sub(".*: ", "", italy_dateTim_updated)
+  rvest::html_text()%>%sub(".*: ", "", .)
+
+path_to_italy_data <- "./data/italy_regional_data/"
+italy_pdfs <- sort(paste(path_to_italy_data,list.files(path_to_italy_data,"*.pdf"),sep = ""))
+italy_xlsx <- sort(paste(path_to_italy_data,list.files(path_to_italy_data,"*.xlsx"),sep = ""))
+
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
-#output <- extract_tables(italy_pdf_link,output = "data.frame", dec=",")
 
-italy_table <- read.csv("italy_data/italy.csv",dec=",")%>% select(c(1,6,7,8))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4) %>% filter(Confirmed != "") %>% head(-1) %>% tail(-1) %>% mutate(Admin2="")
+italy_table <- read.xlsx(italy_xlsx,startRow=4)%>% select(c(1,6,7,8,5))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4,Active=5) %>% filter(Confirmed != "") %>% head(-1)%>% mutate(Admin2="",Last.Update=parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),Source="Ministry of Health of Italy")
 
-rownames(italy_table) <- c()
-italy_table$Last.Update <- rep(parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),nrow(italy_table))
-italy_table$Source <- rep("Ministry of Health of Italy",nrow(italy_table))
-italy_table[c(2,3,4)] <- lapply(italy_table[c(2,3,4)],function(x) as.numeric(gsub("\\.", "", as.character(x))))
+italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin,Country.Region=country,Latitude=lat,Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)%>% mutate(Province.State=convertItalyNames(as.character(Province.State)))
 
-italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)%>% mutate(Province.State=convertItalyNames(as.character(Province.State)))
+italy_coords[length(italy_coords$Province.State),1]<-'Valle d\'Aosta'
 
 italy_table<-merge(italy_table,italy_coords,by = c("Province.State"),all=TRUE)
 bolIdx<-italy_table$Province.State == 'Bolzano'
@@ -128,19 +79,9 @@ italy_table[bolIdx,]$Country.Region <- 'Italy'
 italy_table[bolIdx,]$Longitude <-11.35
 italy_table[bolIdx,]$Latitude <- 46.5
 
-italy_table[, c("Confirmed","Recovered","Deaths")]<- sapply(italy_table[, c("Confirmed","Recovered","Deaths")], as.numeric)
-italy_table <-mutate(italy_table,Active=Confirmed-Deaths-Recovered)
-
 # South Korea (보건복지부) Regional Data Scraping
+
 sk_link <-'http://ncov.mohw.go.kr/bdBoardList_Real.do?brdId=1&brdGubun=13&ncvContSeq=&contSeq=&board_id=&gubun='
-sk_table<-htmltab(sk_link)%>%tail(-1)%>%rename(Province.State=1,New.Cases=2,Confirmed=3,Recovered=4,Deaths=5,Incidence.Rate=6)%>%mutate(Province.State=c("Seoul","Busan","Daegu","Incheon","Gwangju","Daejeon","Ulsan","Sejong","Gyeonggi-do","Gangwon","Chungbuk","Chungnam","Jeonbuk","Jeonnam","Gyeongbuk","Gyeongnam","Jeju","Quarantined"))%>%select(Province.State,New.Cases,Confirmed,Recovered,Deaths)%>%mutate(Source="Ministry of Health and Welfare of the Republic of Korea")%>%mutate(Admin2="")
-
-sk_table[, c("Confirmed","Recovered","Deaths")]<- sapply(sk_table[, c("Confirmed","Recovered","Deaths")], as.numeric)
-
-sk_keep <- sk_table[,c("Province.State","New.Cases")] %>% mutate(Country.Region="Korea, South")
-newDayData <- merge(newDayData,sk_keep,by = c("Province.State","Country.Region","New.Cases"),all=T)
-
-sk_table<-select(sk_table,Province.State,Confirmed,Recovered,Deaths,Source, Admin2)%>%mutate(Active=Confirmed-Deaths-Recovered)
 
 sk_web <- read_html(sk_link)
 sk_dateTim_updated <- sk_web %>% 
@@ -153,53 +94,29 @@ if (substr(sk_dateTim_updated, 1, 1) == " "){
   substr(sk_dateTim_updated, start = 1, stop = 1)<-"0"
 }
 sk_dateTim_updated<-paste(sk_dateTim_updated,substring(Sys.Date(),1,4))
-sk_table$Last.Update <- rep(parse_datetime(sk_dateTim_updated,format="%m.%d. %H %Y",locale = locale(tz="GMT")),nrow(sk_table))
 
-sk_coords <-read.csv('https://simplemaps.com/static/data/country-cities/kr/kr.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin)%>% rename(Country.Region = country)%>%rename(Latitude=lat)%>%rename(Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
+sk_table<-htmltab(sk_link,which = 1)%>%tail(-1)%>%rename(Province.State=1,New.Cases=2,Confirmed=3,Recovered=4,Deaths=5,Incidence.Rate=6)%>%mutate(Province.State=c("Seoul","Busan","Daegu","Incheon","Gwangju","Daejeon","Ulsan","Sejong","Gyeonggi-do","Gangwon","Chungbuk","Chungnam","Jeonbuk","Jeonnam","Gyeongbuk","Gyeongnam","Jeju","Quarantined"))%>%select(Province.State,New.Cases,Confirmed,Recovered,Deaths)%>%mutate(Source="Ministry of Health and Welfare of the Republic of Korea")%>%mutate(Admin2="",Last.Update=parse_datetime(sk_dateTim_updated,format="%m.%d. %H %Y",locale = locale(tz="GMT")))
+sk_table[, c("Confirmed","Recovered","Deaths")]<- sapply(sk_table[, c("Confirmed","Recovered","Deaths")], as.numeric)
 
-sk_table<-merge(sk_table,sk_coords,by = c("Province.State"),all=TRUE)
-sk_table$Country.Region<-rep("Korea, South",nrow(sk_table))
-chungIdx<-sk_table$Province.State == 'Chungnam'
-gyeoIdx<-sk_table$Province.State == 'Gyeongbuk'
-g_doIdx<-sk_table$Province.State == 'Gyeonggi-do'
-jeonIdx<-sk_table$Province.State == 'Jeonnam'
-quarIdx<-sk_table$Province.State == 'Quarantined'
-sejIdx<-sk_table$Province.State == 'Sejong'
+sk_keep <- sk_table[,c("Province.State","New.Cases")] %>% mutate(Country.Region="Korea, South")
+newDayData <- merge(newDayData,sk_keep,by = c("Province.State","Country.Region","New.Cases"),all=T)
 
-sk_table[chungIdx,]$Longitude <-126.800000
-sk_table[chungIdx,]$Latitude <- 36.518400
+sk_table<-select(sk_table,Province.State,Confirmed,Recovered,Deaths,Source,Admin2,Last.Update)%>%mutate(Active=Confirmed-Deaths-Recovered)
 
-sk_table[gyeoIdx,]$Longitude <-128.8889
-sk_table[gyeoIdx,]$Latitude <- 36.4919
+sk_coords <-read.csv('https://simplemaps.com/static/data/country-cities/kr/kr.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin,Country.Region=country,Latitude=lat,Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)
 
-sk_table[g_doIdx,]$Longitude <-127.5183
-sk_table[g_doIdx,]$Latitude <- 37.4138
+source("./functions/coordinates_sk.R")
+sk_table<-merge(sk_table,sk_coords,by = c("Province.State"),all=TRUE)%>%mutate(Country.Region="Korea, South")%>%coordinates_sk(.)
 
-sk_table[jeonIdx,]$Longitude <-126.9910
-sk_table[jeonIdx,]$Latitude <- 34.8679
-
-sk_table[quarIdx,]$Longitude <-127.7669
-sk_table[quarIdx,]$Latitude <- 35.9078
-
-sk_table[sejIdx,]$Longitude <-127.2822
-sk_table[sejIdx,]$Latitude <- 36.4870 
-
-covidData<-rbind(jhuData,italy_table,sk_table)
-
-covidData<-merge(covidData,advisory,by = c("Country.Region"),all=T) %>% drop_na(Confirmed)
+covidData<-rbind(jhuData,italy_table,sk_table)%>%merge(.,advisory,by = c("Country.Region"),all=T) %>% drop_na(Confirmed)
 new_adv <- rename(advisory, Province.State = Country.Region)
-covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)
-
-#covidData[, c("Confirmed","Recovered","Deaths")] <- sapply(covidData[, c("Confirmed","Recovered","Deaths")], as.numeric)
-covidData <- arrange(covidData,desc(Confirmed))
-covidData <- covidData[!(covidData$Country.Region=="Italy" & covidData$Source=="Johns Hopkins University CSSE") & !(covidData$Country.Region=="Korea, South" & covidData$Source=="Johns Hopkins University CSSE"),] 
+covidData<-merge(covidData,new_adv,by = c("Province.State","Advisory.Level","Advisory.DateUpdated"),all=T) %>% drop_na(Confirmed)%>%.[!(.$Country.Region=="Italy" & .$Source=="Johns Hopkins University CSSE") & !(.$Country.Region=="Korea, South" & .$Source=="Johns Hopkins University CSSE"),] 
 
 covidData[is.na(covidData$Active),"Active"]<-covidData[is.na(covidData$Active),"Confirmed"]
-covidData<-merge(covidData,newDayData,by=c("Province.State","Country.Region"),all=T) %>% drop_na(Confirmed)
 
-covidData<-arrange(covidData,desc(Active))
+covidData<-merge(covidData,newDayData,by=c("Province.State","Country.Region"),all=T) %>% drop_na(Confirmed)%>%arrange(.,desc(Active))
 
-col_order <- c("Admin2","Country.Region", "Province.State", "Last.Update","Confirmed","Recovered","Deaths","Active","New.Cases","New.Deaths","New.Recovered","Advisory.Level","Advisory.DateUpdated","Latitude","Longitude","Source")
+col_order <- c("Admin2","Country.Region", "Province.State", "Last.Update","Confirmed","Recovered","Deaths","Active","New.Cases","New.Deaths","Advisory.Level","Advisory.DateUpdated","Latitude","Longitude","Source")
 covidData <- covidData[, col_order] 
 
 rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedData","tsDeathsData","tsRecoveredData")))
