@@ -129,7 +129,7 @@ rm(list=setdiff(ls(), c("covidData","treatmentData","vaccineData","tsConfirmedDa
 
 Global Map
 =======================================
-Input {.sidebar}
+Column {data-width=350}
 -------------------------------------
 
 ### Active Cases
@@ -237,38 +237,9 @@ m  # Print the map
 
 ```
 
-Column {data-width=300}
------------
 
-
-###
-
-```{r }
-
-reactive_case_count <- renderText({
-  paste0(prettyNum(sum(covidData$Confirmed), big.mark=","), " cases")
-})
-
-reactive_recovered_count <- renderText({
-  paste0(prettyNum(sum(covidData$Recovered), big.mark=","), " recovered")
-})
-
-reactive_active_count <- renderText({
-  paste0(prettyNum(sum(covidData$Active), big.mark=","), " active cases")
-})
-
-reactive_country_count <- renderText({
-  paste0(length(unique(covidData$Country.Region)), " countries/regions affected")
-})
-
-absolutePanel(id = "controls", class = "panel panel-default",fixed=TRUE, height = "auto",                                   h3(textOutput("reactive_case_count"), align = "right"),
-              h4(textOutput("reactive_death_count"), align = "right"),
-              span(h4(textOutput("reactive_recovered_count"), align = "right"), style="color:#006d2c"),
-              span(h4(textOutput("reactive_active_count"), align = "right"), style="color:#cc4c02"),
-              h6(textOutput("clean_date_reactive"), align = "right"),
-              h6(textOutput("reactive_country_count"), align = "right"),)
-
-```
+Time-series Plots by Country
+=======================================
 
 ###
 
@@ -303,10 +274,7 @@ renderPlotly({
 ```
 
 
-Statistics
-=======================================
-
-About
+Treatments and Vaccines
 =======================================
 
 
