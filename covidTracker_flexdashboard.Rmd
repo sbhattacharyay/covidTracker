@@ -12,9 +12,35 @@ output:
 ---
 
 ```{r global, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(httr)
+library(magrittr)
+library(modelr)
+library(pillar)
+library(purrr)
+library(readr)
+library(readxl)
+library(rstudioapi)
+library(rvest)
+library(stringr)
+library(tibble)
+library(tidyr)
+library(xml2)
+library(plotly)
+library(shiny)
+library(rvest)
+library(tabulizer)
+library(htmltab)
+library(XML)
+library(pdftools)
+library(tesseract)
+library(leaflet)
+library(openxlsx)
+library(htmltools)
+library(shinydashboard)
+library(DT)
 
-Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard","DT","geojsonio")
-lapply(Packages, library, character.only = TRUE)
 
 jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
 csvFiles<-sort(xpathSApply(htmlParse(jhuCSSE), "//a[contains(@class,'js-navigation-open')]/@href"))
@@ -218,33 +244,32 @@ Column {data-width=650}
 
 source('functions/correct_world_names.R')
 source('functions/produce_labels.R')
-
-worldcountry = geojson_read("./countries.geo.json", what = "sp")
-worldcountry$name<-correct_world_names(worldcountry$name)
-
-mutualCountries <- worldcountry$name[worldcountry$name %in% covidData$Country.Region]
-advisoryFiltData <- filter(covidData,Country.Region %in% mutualCountries)
 # 
+# worldcountry = geojson_read("./countries.geo.json", what = "sp")
+# worldcountry$name<-correct_world_names(worldcountry$name)
+# 
+# mutualCountries <- worldcountry$name[worldcountry$name %in% covidData$Country.Region]
+# advisoryFiltData <- filter(covidData,Country.Region %in% mutualCountries)
+# # 
 # qpal <- colorFactor("YlOrRd", (as.factor(advisoryFiltData$Advisory.Level)))
 # polygons = worldcountry[worldcountry$name %in% covidData$Country.Region, ]
 
-basemap<-leaflet(data = worldcountry,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>%
-  addProviderTiles(provider = providers$CartoDB.Positron) %>%
-  addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>%
-  hideGroup(c("Confirmed", "Recovered", "Deaths"))  %>%
-  setView(lng = -92 ,lat=26,zoom = 3) %>%
-  setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 =90)%>%
-  # addLegend("bottomright", pal = qpal, values = ~(as.factor(advisoryFiltData$Advisory.Level)), title = "<small>US DOS Travel Advisory Level</small>")%>%
-  addCircleMarkers(data = covidData,radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),color = "#662506",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Active")%>%
-  addCircleMarkers(data = covidData,radius=~log(Confirmed),lng = ~Longitude,lat = ~Latitude,weight = ~(Confirmed)**(1/3),color = "#cc4c02",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Confirmed")%>%
-  addCircleMarkers(data = covidData,radius=~log(Recovered),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#045a8d",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Recovered")%>%
-  addCircleMarkers(data = covidData,radius=~log(Deaths),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#4d004b",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Deaths")
-# # 
+basemap<-leaflet(data = covidData,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>%
+  addProviderTiles(provider = providers$CartoDB.Positron)%>% addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>% hideGroup(c("Confirmed", "Recovered", "Deaths")) %>%setView(lng = -92 ,lat=26,zoom = 3) %>% setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 =90) %>%
+  #addLegend("bottomright", pal = qpal, values = ~(as.factor(advisoryFiltData$Advisory.Level)), title = "<small>US DOS Travel Advisory Level</small>")%>%
+addCircleMarkers(data = covidData,radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),color = "#662506",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Active")
+#%>%addPolygons(data=polygons,stroke = F, smoothFactor = 0.1, fillOpacity = 1, fillColor = ~qpal(as.factor(as.factor(advisoryFiltData$Advisory.Level))))
+# 
+# %>% addCircleMarkers(data = covidData,radius=~log(Confirmed),lng = ~Longitude,lat = ~Latitude,weight = ~(Confirmed)**(1/3),color = "#cc4c02",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Confirmed")%>%
+# addCircleMarkers(data = covidData,radius=~log(Recovered),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#045a8d",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Recovered")%>%
+# addCircleMarkers(data = covidData,radius=~log(Deaths),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#4d004b",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Deaths")%>%
+#   addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>%
+#   hideGroup(c("Confirmed", "Recovered", "Deaths"))
+# # # 
 # # %>%addPolygons(data=polygons,stroke = F, smoothFactor = 0.1, fillOpacity = 1, fillColor = ~qpal(as.factor(as.factor(advisoryFiltData$Advisory.Level))))
 # 
 # 
 basemap
-
 ```
 
 
@@ -372,3 +397,4 @@ DT::renderDataTable({
   )
 })
 ```
+
