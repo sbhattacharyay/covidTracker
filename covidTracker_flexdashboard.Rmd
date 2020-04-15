@@ -89,8 +89,8 @@ italy_dateTim_updated <- italy_web %>%
   rvest::html_text()%>%sub(".*: ", "", .)
 
 path_to_italy_data <- "./data/italy_regional_data"
-italy_pdfs <- sort(list.files(path_to_italy_data,"*.pdf",full.names=T))
-italy_xlsx <- sort(list.files(path_to_italy_data,"*.xlsx",full.names=T))
+italy_pdfs <- sort(list.files(path_to_italy_data,"*.pdf",full.names=T))[-1]
+italy_xlsx <- sort(list.files(path_to_italy_data,"*.xlsx",full.names=T))[-1]
 
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
@@ -356,27 +356,8 @@ Column {data-width=350}
 
 ```{r}
 radioButtons("radio_select",NULL, c("Vaccine Data"="vaccineData","Treatment Data"="treatmentData"), selected = NULL, inline=T)
-vaccineData<-vaccineData%>%
-  select(-Number)%>%
-  rename("Type of Vaccine"= "Type.of.Vaccine",
-                                      "Developer"= "Developer..Researcher",
-                                      "Current Stage of Development"="Current.Stage.of.Development" ,
-                                      "Related Vaccine Platforms"="Related.Use.Platform",
-                                      "Funding Sources"="Funding.Sources",
-                                      "Anticipated Timing"="Anticipated.Timing",
-                                      "Data Sources"="Sources",
-                                      "Last Update"="Last.Update")
-treatmentData<-treatmentData%>%
-  select(-Number)%>%
-  rename("Type of Treatment"="Type.of.Product...Treatment",
-         "Indications of FDA Approval"="FDA.Approved.Indications..Treatments.",
-         "Ongoing Clinical Trials for Other Diseases"="Clinical.Trials.Ongoing.for.Other.Diseases",
-         "Developer"="Developer..Researcher",
-         "Current Stage of Development"="Current.Stage.of.Development",
-         "Funding Sources"="Funding.Sources",
-         "Anticipated Timing"="Anticipated.Timing",
-          "Data Sources"="Sources",
-           "Last Update"="Last.Update")
+vaccineData<-vaccineData%>%discard(~all(is.na(.x)))%>%select(-Number)
+treatmentData<-treatmentData%>%discard(~all(is.na(.x)))%>%select(-Number)
 
 DT::renderDataTable({
   data<-
@@ -392,4 +373,26 @@ DT::renderDataTable({
     rownames = FALSE
   )
 })
+
+# 
+# %>%
+#   rename("Type of Vaccine"= "Type.of.Vaccine",
+#                                       "Developer"= "Developer.Researcher",
+#                                       "Current Stage of Development"="Current.Stage.of.Development",
+#                                       "Related Vaccine Platforms"="Related.Use.Platform",
+#                                       "Funding Sources"="Funding.Sources",
+#                                       "Anticipated Timing"="Anticipated.Timing",
+#                                       "Data Sources"="Sources",
+#                                       "Last Update"="Last.Update")
+# 
+# %>%
+#   rename("Type of Treatment"="Type.of.Product...Treatment",
+#          "Indications of FDA Approval"="FDA.Approved.Indications..Treatments.",
+#          "Ongoing Clinical Trials for Other Diseases"="Clinical.Trials.Ongoing.for.Other.Diseases",
+#          "Developer"="Developer..Researcher",
+#          "Current Stage of Development"="Current.Stage.of.Development",
+#          "Funding Sources"="Funding.Sources",
+#          "Anticipated Timing"="Anticipated.Timing",
+#           "Data Sources"="Sources",
+#            "Last Update"="Last.Update")
 ```
