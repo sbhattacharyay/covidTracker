@@ -4,6 +4,8 @@ resource_files:
 - data/italy_regional_data/italy_032320.pdf
 - data/italy_regional_data/italy_032320.xlsx
 - data/italy_regional_data/italy.csv
+- data/italy_regional_data/italy_041420.xlsx
+- data/italy_regional_data/italy_041420.pdf
 runtime: shiny
 output:
   flexdashboard::flex_dashboard:
@@ -95,7 +97,8 @@ italy_xlsx <- sort(list.files(path_to_italy_data,"*.xlsx",full.names=T))[-1]
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
 
-italy_table <- read.xlsx(italy_xlsx,sheetIndex=1,startRow=4)%>% select(c(1,6,7,8,5))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4,Active=5) %>% filter(Confirmed != "") %>% head(-1)%>% mutate(Admin2="",Last.Update=parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),Source="Ministry of Health of Italy")
+italy_table <- read.xlsx(italy_xlsx,sheetIndex=1,startRow=4)%>%drop_na(2)%>%head(-1)%>%discard(~all(is.na(.x)))%>% select(c(1,6,7,8,5))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4,Active=5)%>%
+mutate(Admin2="",Last.Update=parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),Source="Ministry of Health of Italy")
 
 italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin,Country.Region=country,Latitude=lat,Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)%>% mutate(Province.State=convertItalyNames(as.character(Province.State)))
 
