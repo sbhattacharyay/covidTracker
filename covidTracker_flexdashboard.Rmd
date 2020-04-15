@@ -1,46 +1,43 @@
 ---
 title: "COVID-19 Global Case and Treatment Tracker"
+resource_files:
+- data/italy_regional_data/italy_032320.pdf
+- data/italy_regional_data/italy_032320.xlsx
+- data/italy_regional_data/italy.csv
 runtime: shiny
-output: 
+output:
   flexdashboard::flex_dashboard:
-    logo: university.shield.small.black.png
     favicon: favicon-32x32.png
+    logo: university.shield.small.black.png
     orientation: column
-    vertical_layout: fill
     social: menu
     source_code: embed
+    vertical_layout: fill
 ---
 
 ```{r global, include=FALSE}
-library(dplyr)
-library(ggplot2)
-library(httr)
-library(magrittr)
-library(modelr)
-library(pillar)
-library(purrr)
-library(readr)
-library(readxl)
-library(rstudioapi)
-library(rvest)
-library(stringr)
-library(tibble)
-library(tidyr)
-library(xml2)
-library(plotly)
-library(shiny)
-library(rvest)
-library(tabulizer)
-library(htmltab)
-library(XML)
-library(pdftools)
-library(tesseract)
-library(leaflet)
-library(openxlsx)
-library(htmltools)
-library(shinydashboard)
-library(DT)
 
+#Packages <- c("tidyverse","shiny","magrittr","httr","plotly","rvest","tabulizer","XML","xml2","htmltab","pdftools","tesseract","leaflet","openxlsx","htmltools","shinydashboard","DT","geojsonio")
+#lapply(Packages, library, character.only = TRUE)
+
+library("tidyverse")
+library("shiny")
+library("magrittr")
+library("httr")
+library("plotly")
+library("rvest")
+library("tabulizer")
+library("XML")
+library("xml2")
+library("htmltab")
+library("pdftools")
+library("tesseract")
+library("leaflet")
+library("xlsx")
+library("htmltools")
+library("shinydashboard")
+library("DT")
+library("geojsonio")
 
 jhuCSSE <- read_html('https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports')
 csvFiles<-sort(xpathSApply(htmlParse(jhuCSSE), "//a[contains(@class,'js-navigation-open')]/@href"))
@@ -67,9 +64,9 @@ path_to_milken_pdf <- './data/vaccine_and_treatment_data/milken_tracker_data.pdf
 path_to_milken_xlsx <- './data/vaccine_and_treatment_data/milken_tracker_data.xlsx'
 updateTime<-sub(".*Updated ", "", pdf_text(path_to_milken_pdf))[1]%>% substr(1,nchar(.)-1)%>%parse_datetime(format="%B %d, %Y, at %I:%M p.m.",locale = locale(tz="America/New_York"))
 
-treatmentData<-read.xlsx(path_to_milken_xlsx,sheet=1,startRow=10)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Product.-.Treatment")
+treatmentData<-read.xlsx(path_to_milken_xlsx,sheetIndex=1,startRow=10)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Product...Treatment")
 
-vaccineData<-read.xlsx(path_to_milken_xlsx,sheet=2,startRow=2)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Vaccine")
+vaccineData<-read.xlsx(path_to_milken_xlsx,sheetIndex=2,startRow=2)%>%filter(Number!="Number")%>%mutate(Last.Update=updateTime)%>%drop_na("Type.of.Vaccine")
 
 # US Department of State Travel Advisory
 source("./functions/convertAdvisoryNames.R")
@@ -91,14 +88,14 @@ italy_dateTim_updated <- italy_web %>%
   xml2::xml_find_all("//h4[contains(@class, 'blu-italia-base-color') and contains(@style,'font-size:24px;margin:0;')]") %>% 
   rvest::html_text()%>%sub(".*: ", "", .)
 
-path_to_italy_data <- "./data/italy_regional_data/"
-italy_pdfs <- sort(paste(path_to_italy_data,list.files(path_to_italy_data,"*.pdf"),sep = ""))
-italy_xlsx <- sort(paste(path_to_italy_data,list.files(path_to_italy_data,"*.xlsx"),sep = ""))
+path_to_italy_data <- "./data/italy_regional_data"
+italy_pdfs <- sort(list.files(path_to_italy_data,"*.pdf",full.names=T))
+italy_xlsx <- sort(list.files(path_to_italy_data,"*.xlsx",full.names=T))
 
 italy_pdf_link <- xpathSApply(htmlParse(italy_Link), "//a[contains(@title,'apre file pdf')]/@href")[1]
 italy_pdf_link<-paste('http://www.salute.gov.it',italy_pdf_link,sep = "")
 
-italy_table <- read.xlsx(italy_xlsx,startRow=4)%>% select(c(1,6,7,8,5))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4,Active=5) %>% filter(Confirmed != "") %>% head(-1)%>% mutate(Admin2="",Last.Update=parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),Source="Ministry of Health of Italy")
+italy_table <- read.xlsx(italy_xlsx,sheetIndex=1,startRow=4)%>% select(c(1,6,7,8,5))%>% rename(Province.State=1,Recovered=2,Deaths=3,Confirmed=4,Active=5) %>% filter(Confirmed != "") %>% head(-1)%>% mutate(Admin2="",Last.Update=parse_datetime(italy_dateTim_updated,format="%d %B %Y, ore %H.%M",locale = locale("it",tz="Europe/Rome")),Source="Ministry of Health of Italy")
 
 italy_coords <-read.csv('https://simplemaps.com/static/data/country-cities/it/it.csv')%>%filter(capital == "admin" | capital == "primary")%>%rename(Province.State=admin,Country.Region=country,Latitude=lat,Longitude=lng)%>%select(Province.State,Country.Region,Latitude,Longitude)%>% mutate(Province.State=convertItalyNames(as.character(Province.State)))
 
@@ -165,13 +162,13 @@ Column {data-width=175}
 
 ```{r }
 
-valueBox(`attr<-`(Sys.time(),"tzone","GMT"),"",icon = icon("calendar"),width=NULL,color="aqua")
+valueBox(`attr<-`(Sys.time(),"tzone","GMT"),"",icon = icon("calendar"), width=NULL)
 ```
+
 
 ### Active Cases
 
 ```{r }
-
 renderValueBox({
   if (input$countryChoice == "World"){
     val<-sum(covidData$Active,na.rm = T)
@@ -179,7 +176,7 @@ renderValueBox({
     filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
     val<-sum(filtData$Active,na.rm = T)
   }
-  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+  shinydashboard::valueBox(val,input$countryChoice, width=NULL)
 })
 
 ```
@@ -195,7 +192,7 @@ renderValueBox({
     filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
     val<-sum(filtData$Confirmed,na.rm = T)
   }
-  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+  shinydashboard::valueBox(val,input$countryChoice,width=NULL)
 })
 
 
@@ -212,7 +209,7 @@ renderValueBox({
     filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
     val<-sum(filtData$Deaths,na.rm = T)
   }
-  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+  shinydashboard::valueBox(val,input$countryChoice,width=NULL)
 })
 
 
@@ -229,7 +226,7 @@ renderValueBox({
     filtData<-covidData %>% filter(as.character(Country.Region) == input$countryChoice)
     val<-sum(filtData$Recovered,na.rm = T)
   }
-  valueBox(val,input$countryChoice,width=NULL,color="aqua")
+  shinydashboard::valueBox(val,input$countryChoice,width=NULL)
 })
 
 ```
@@ -244,47 +241,49 @@ Column {data-width=650}
 
 source('functions/correct_world_names.R')
 source('functions/produce_labels.R')
-# 
-# worldcountry = geojson_read("./countries.geo.json", what = "sp")
-# worldcountry$name<-correct_world_names(worldcountry$name)
-# 
-# mutualCountries <- worldcountry$name[worldcountry$name %in% covidData$Country.Region]
-# advisoryFiltData <- filter(covidData,Country.Region %in% mutualCountries)
-# # 
+
+worldcountry = geojson_read("./countries.geo.json", what = "sp")
+worldcountry$name<-correct_world_names(worldcountry$name)
+
+mutualCountries <- worldcountry$name[worldcountry$name %in% covidData$Country.Region]
+advisoryFiltData <- filter(covidData,Country.Region %in% mutualCountries)
+#
 # qpal <- colorFactor("YlOrRd", (as.factor(advisoryFiltData$Advisory.Level)))
 # polygons = worldcountry[worldcountry$name %in% covidData$Country.Region, ]
 
-basemap<-leaflet(data = covidData,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>%
-  addProviderTiles(provider = providers$CartoDB.Positron)%>% addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>% hideGroup(c("Confirmed", "Recovered", "Deaths")) %>%setView(lng = -92 ,lat=26,zoom = 3) %>% setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 =90) %>%
-  #addLegend("bottomright", pal = qpal, values = ~(as.factor(advisoryFiltData$Advisory.Level)), title = "<small>US DOS Travel Advisory Level</small>")%>%
-addCircleMarkers(data = covidData,radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),color = "#662506",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Active")
-#%>%addPolygons(data=polygons,stroke = F, smoothFactor = 0.1, fillOpacity = 1, fillColor = ~qpal(as.factor(as.factor(advisoryFiltData$Advisory.Level))))
-# 
-# %>% addCircleMarkers(data = covidData,radius=~log(Confirmed),lng = ~Longitude,lat = ~Latitude,weight = ~(Confirmed)**(1/3),color = "#cc4c02",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Confirmed")%>%
-# addCircleMarkers(data = covidData,radius=~log(Recovered),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#045a8d",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Recovered")%>%
-# addCircleMarkers(data = covidData,radius=~log(Deaths),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#4d004b",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Deaths")%>%
-#   addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>%
-#   hideGroup(c("Confirmed", "Recovered", "Deaths"))
-# # # 
+output$basemap<-renderLeaflet({leaflet(data = worldcountry,options = leafletOptions(minZoom = 2, maxZoom = 8)) %>%
+  addProviderTiles(provider = providers$CartoDB.Positron) %>%
+  addLayersControl(position = "bottomright",overlayGroups = c("Active", "Confirmed", "Recovered", "Deaths"),options = layersControlOptions(collapsed = FALSE))%>%
+  hideGroup(c("Confirmed", "Recovered", "Deaths"))  %>%
+  setView(lng = -92 ,lat=26,zoom = 3) %>%
+  setMaxBounds(lng1 = -180,lat1 = -90,lng2 = 180,lat2 =90)%>%
+  # addLegend("bottomright", pal = qpal, values = ~(as.factor(advisoryFiltData$Advisory.Level)), title = "<small>US DOS Travel Advisory Level</small>")%>%
+  addCircleMarkers(data = covidData,radius=~log(Active),lng = ~Longitude,lat = ~Latitude,weight = ~(Active)**(1/3),color = "#662506",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Active")%>%
+  addCircleMarkers(data = covidData,radius=~log(Confirmed),lng = ~Longitude,lat = ~Latitude,weight = ~(Confirmed)**(1/3),color = "#cc4c02",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Confirmed")%>%
+  addCircleMarkers(data = covidData,radius=~log(Recovered),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#045a8d",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Recovered")%>%
+  addCircleMarkers(data = covidData,radius=~log(Deaths),lng = ~Longitude,lat = ~Latitude,weight = ~(Recovered)**(1/3),color = "#4d004b",label = produce_labels(covidData),labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),textsize = "15px", direction = "auto"),group = "Deaths")
+})
+# #
 # # %>%addPolygons(data=polygons,stroke = F, smoothFactor = 0.1, fillOpacity = 1, fillColor = ~qpal(as.factor(as.factor(advisoryFiltData$Advisory.Level))))
-# 
-# 
-basemap
+#
+#
+leafletOutput('basemap')
+
 ```
 
 
 Column {data-width=175}
 -------------------------------------
 
-### 1.) Select Variable to Track
+<!-- ### 1.) Select Variable to Track -->
 
-```{r }
+<!-- ```{r } -->
 
-inputPanel(radioButtons("trackVar", label="COVID-19 Cases:",choices = list("Active","Confirmed","Deaths","Recovered")))
+<!-- inputPanel(radioButtons("trackVar", label="COVID-19 Cases:",choices = list("Active","Confirmed","Deaths","Recovered"))) -->
 
-```
+<!-- ``` -->
 
-### 2.) Filter by Country or Region:
+### Filter by Country or Region:
 
 ```{r }
 
@@ -294,21 +293,21 @@ inputPanel(selectInput("countryChoice", label = "Country or Region", choices = c
 
 ```
 
-### 3.) Submit or Reset Changes to World
+<!-- ### 3.) Submit or Reset Changes to World -->
 
-```{r }
+<!-- ```{r } -->
 
-inputPanel(actionButton("submit", "Submit"))
-inputPanel(actionButton("reset", "Reset to World"))
+<!-- inputPanel(actionButton("submit", "Submit")) -->
+<!-- inputPanel(actionButton("reset", "Reset to World")) -->
 
-```
+<!-- ``` -->
 
 Time-series Plots by Country
 =======================================
 
 Column {data-width=350}
 -------------------------------------
-### Filter by Country:
+### View Time-series for Confirmed Cases by Country:
 
 ```{r }
 countryNames <- as.character(unique(covidData$Country.Region))
@@ -323,15 +322,12 @@ Column
 ```{r }
 names(tsConfirmedData) <- gsub("X", "", names(tsConfirmedData))
 library(plyr)
-tsConfirmedData_sum<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum)) 
+tsConfirmedData_sum<- ddply(tsConfirmedData, "Country.Region", numcolwise(sum))
 detach("package:plyr", unload = TRUE)
 tsConfirmedData_sum<-tsConfirmedData_sum[c(-2,-3)]
 tsConfirmedData_sum<- tsConfirmedData_sum[1:length(tsConfirmedData_sum)-1]
 names(tsConfirmedData_sum)<-gsub("Country.Region", "Dates", names(tsConfirmedData_sum))
 ts_confirmed <- reactive({
-  tsConfirmedData %>%
-    filter(Country.Region==input$countryChoice) %>%
-    tidyr::gather(Country.Region)
   tsConfirmedData_sum %>%
   filter(Dates==input$countryChoice_ts) %>%
   tidyr::gather(Dates)%>%
@@ -343,10 +339,10 @@ renderPlotly({
   geom_line()+
   geom_point(colour = "blue")+
   #ggtitle("Confirmed Cases") +
-  theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),panel.background = element_blank(), 
+  theme(axis.text.x=element_text(angle=90,hjust=1),panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),panel.background = element_blank(),
         axis.line = element_line(colour = "black"),plot.title = element_text(hjust = 0.5))+
-  ylab('Number of Cases') + 
+  ylab('Number of Cases') +
   xlab('Date')
 })
 ```
@@ -362,26 +358,26 @@ Column {data-width=350}
 radioButtons("radio_select",NULL, c("Vaccine Data"="vaccineData","Treatment Data"="treatmentData"), selected = NULL, inline=T)
 vaccineData<-vaccineData%>%
   select(-Number)%>%
-  rename("Type of Vaccine"= "Type.of.Vaccine", 
-                                      "Developer"= "Developer/.Researcher",
+  rename("Type of Vaccine"= "Type.of.Vaccine",
+                                      "Developer"= "Developer..Researcher",
                                       "Current Stage of Development"="Current.Stage.of.Development" ,
-                                      "Related Vaccine Platforms"="Related.Use/Platform",
+                                      "Related Vaccine Platforms"="Related.Use.Platform",
                                       "Funding Sources"="Funding.Sources",
                                       "Anticipated Timing"="Anticipated.Timing",
                                       "Data Sources"="Sources",
                                       "Last Update"="Last.Update")
 treatmentData<-treatmentData%>%
   select(-Number)%>%
-  rename("Type of Treatment"="Type.of.Product.-.Treatment",
-         "Indications of FDA Approval"="FDA-Approved.Indications.(Treatments)",
+  rename("Type of Treatment"="Type.of.Product...Treatment",
+         "Indications of FDA Approval"="FDA.Approved.Indications..Treatments.",
          "Ongoing Clinical Trials for Other Diseases"="Clinical.Trials.Ongoing.for.Other.Diseases",
-         "Developer"="Developer/.Researcher",
+         "Developer"="Developer..Researcher",
          "Current Stage of Development"="Current.Stage.of.Development",
          "Funding Sources"="Funding.Sources",
          "Anticipated Timing"="Anticipated.Timing",
           "Data Sources"="Sources",
            "Last Update"="Last.Update")
-  
+
 DT::renderDataTable({
   data<-
     switch(input$radio_select,"vaccineData"=vaccineData,"treatmentData"=treatmentData) %>%
@@ -393,8 +389,7 @@ DT::renderDataTable({
     scrollY=400,
     fixedColumns = TRUE,
     columnDefs = list(list(className = 'dt-left', targets = "_all"))),
-    rownames = FALSE,
+    rownames = FALSE
   )
 })
 ```
-
